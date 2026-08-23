@@ -6,7 +6,7 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
-import android.view.inputmethod.InputMethodService
+import android.inputmethodservice.InputMethodService
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
