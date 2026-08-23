@@ -77,33 +77,40 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         root.addView(View(this).apply { background = panel(3, 0xffc9c9cf.toInt(), Color.TRANSPARENT) },
             LinearLayout.LayoutParams(dp(38), dp(4)).apply { bottomMargin = dp(6) })
 
-        val bar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
         val transcriptCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(14), dp(8), dp(12), dp(8))
+            setPadding(dp(14), dp(7), dp(14), dp(7))
             background = panel(18, 0xfaffffff.toInt())
         }
-        status = label("Ready", 11f, coral, Typeface.BOLD)
-        transcriptCard.addView(status, LinearLayout.LayoutParams(-1, dp(16)))
-        transcript = label("Tap the microphone and speak.", 15f, ink, Typeface.BOLD).apply {
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
+        val meta = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        transcriptCard.addView(transcript, LinearLayout.LayoutParams(-1, dp(25)))
+        status = label("Ready", 11f, coral, Typeface.BOLD)
+        meta.addView(status, LinearLayout.LayoutParams(0, dp(16), 1f))
         detail = label(engine.id, 11f, secondary).apply {
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
+            gravity = Gravity.END or Gravity.CENTER_VERTICAL
+        }
+        meta.addView(detail, LinearLayout.LayoutParams(0, dp(16), 1.4f))
+        transcriptCard.addView(meta, LinearLayout.LayoutParams(-1, dp(16)))
+        transcript = label("Tap the microphone and speak.", 16f, ink, Typeface.BOLD).apply {
+            maxLines = 2
+            ellipsize = TextUtils.TruncateAt.START
             gravity = Gravity.CENTER_VERTICAL
         }
-        transcriptCard.addView(detail, LinearLayout.LayoutParams(-1, dp(16)))
-        bar.addView(transcriptCard, LinearLayout.LayoutParams(0, dp(64), 1f).apply { marginEnd = dp(7) })
+        transcriptCard.addView(transcript, LinearLayout.LayoutParams(-1, dp(38)))
+        root.addView(transcriptCard, LinearLayout.LayoutParams(-1, dp(54)))
 
-        bar.addView(control("↶", "Undo last insert") { undoInsert() }, LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginEnd = dp(6) })
+        val controls = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, dp(6), 0, 0)
+        }
+
+        controls.addView(control("↶", "Undo last insert") { undoInsert() }, LinearLayout.LayoutParams(dp(46), dp(46)).apply { marginEnd = dp(7) })
         mic = Button(this).apply {
             text = "●"
             contentDescription = "Start voice input"
@@ -116,8 +123,8 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
             elevation = dp(6).toFloat()
             setOnClickListener { toggleListening() }
         }
-        bar.addView(mic, LinearLayout.LayoutParams(dp(54), dp(54)).apply { marginEnd = dp(6) })
-        bar.addView(control("×", "Clear transcript") { clearDraft() }, LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginEnd = dp(6) })
+        controls.addView(mic, LinearLayout.LayoutParams(dp(54), dp(54)).apply { marginEnd = dp(7) })
+        controls.addView(control("×", "Clear transcript") { clearDraft() }, LinearLayout.LayoutParams(dp(46), dp(46)).apply { marginEnd = dp(7) })
 
         val insert = Button(this).apply {
             text = "Insert"
@@ -132,8 +139,8 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
             background = panel(18, 0xf9ffffff.toInt())
             setOnClickListener { insertDraft() }
         }
-        bar.addView(insert, LinearLayout.LayoutParams(dp(64), dp(44)))
-        root.addView(bar, LinearLayout.LayoutParams(-1, dp(64)))
+        controls.addView(insert, LinearLayout.LayoutParams(dp(78), dp(46)))
+        root.addView(controls, LinearLayout.LayoutParams(-1, dp(60)))
         return root
     }
 
