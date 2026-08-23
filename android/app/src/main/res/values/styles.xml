@@ -1,0 +1,5 @@
+<resources>
+    <style name="Theme.EasyFlow" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:fontFamily">sans</item><item name="android:colorAccent">#D7192D</item><item name="android:navigationBarColor">#FFFFFF</item><item name="android:windowLightNavigationBar">true</item><item name="android:windowBackground">#FFFFFF</item>
+    </style>
+</resources>

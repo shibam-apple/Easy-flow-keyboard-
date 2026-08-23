@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="description" content="Easy Flow voice-first keyboard prototype" />
+  <title>Easy Flow</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="phone-shell" aria-label="Easy Flow keyboard prototype">
+    <header class="app-bar">
+      <span></span>
+      <h1>Easy Flow</h1>
+      <button class="icon-button" id="infoButton" aria-label="About Easy Flow">•••</button>
+    </header>
+
+    <section class="conversation" aria-label="Message preview">
+      <p class="composer" id="composerText">I’ll send the updated design tonight.</p>
+    </section>
+
+    <section class="keyboard" id="keyboard">
+      <div class="waveform" id="waveform" aria-hidden="true"></div>
+      <p class="status" id="status" aria-live="polite">Tap to speak</p>
+      <p class="language" id="languageButton">English (India)</p>
+      <div class="tools">
+        <button class="round" id="undoButton" aria-label="Undo">↶</button>
+        <button class="mic" id="micButton" aria-label="Start voice input"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 0 0 3.5-3.5V6a3.5 3.5 0 1 0-7 0v6a3.5 3.5 0 0 0 3.5 3.5Zm-6-4a1 1 0 0 1 2 0V12a4 4 0 0 0 8 0v-.5a1 1 0 1 1 2 0V12a6 6 0 0 1-5 5.92V20h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.08A6 6 0 0 1 6 12v-.5Z"/></svg></button>
+        <button class="round" id="backspaceButton" aria-label="Clear transcript">⌫</button>
+        <button class="insert" id="insertButton">Insert</button>
+      </div>
+      <div class="sr-only"><span id="beforeText">Ill send the updated design tonite</span><span id="afterText">I’ll send the updated design tonight.</span></div>
+    </section>
+  </main>
+
+  <dialog id="aboutDialog">
+    <h2>Easy Flow</h2>
+    <p>A voice-first keyboard concept. Your current draft stays in this page and is not saved.</p>
+    <button id="closeDialog">Done</button>
+  </dialog>
+  <script src="app.js"></script>
+</body>
+</html>
