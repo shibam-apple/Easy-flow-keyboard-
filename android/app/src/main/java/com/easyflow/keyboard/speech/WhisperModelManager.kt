@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.DigestInputStream
 import java.security.MessageDigest
 
 class WhisperModelManager(context: Context) {
@@ -20,14 +21,21 @@ class WhisperModelManager(context: Context) {
             val connection = (URL(BuildConfig.WHISPER_MODEL_URL).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 20_000; readTimeout = 30_000; instanceFollowRedirects = true
             }
-            connection.inputStream.use { input ->
-                part.outputStream().buffered().use { output ->
+            val messageDigest = MessageDigest.getInstance("SHA-256")
+            connection.inputStream.use { networkInput ->
+                DigestInputStream(networkInput.buffered(), messageDigest).use { input ->
+                    part.outputStream().buffered().use { output ->
                     val total = connection.contentLengthLong.coerceAtLeast(1); val buffer = ByteArray(128 * 1024); var done = 0L
                     while (true) { val read = input.read(buffer); if (read < 0) break; output.write(buffer, 0, read); done += read; onProgress((done * 100 / total).toInt().coerceIn(0, 100)) }
+                    }
                 }
             }
-            val digest = MessageDigest.getInstance("SHA-256").digest(part.readBytes()).joinToString("") { "%02x".format(it) }
-            check(digest == BuildConfig.WHISPER_MODEL_SHA256) { "Downloaded model failed integrity verification" }
+            connection.disconnect()
+            val digest = messageDigest.digest().joinToString("") { "%02x".format(it) }
+            check(digest == BuildConfig.WHISPER_MODEL_SHA256) {
+                part.delete()
+                "Model download was incomplete. Please retry on a stable connection."
+            }
             check(part.renameTo(modelFile)) { "Could not activate downloaded model" }
             modelFile
         }
