@@ -9,8 +9,9 @@ android {
         targetSdk = 35
         versionCode = 2
         versionName = "0.2.0"
-        buildConfigField("String", "WHISPER_MODEL_URL", "\"https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en-q5_1.bin\"")
-        buildConfigField("String", "WHISPER_MODEL_SHA256", "\"323473b7c41bfb7fb994c1e9526abdcc7c55d3a909c8fa0c29f753005e87d372\"")
+        // Pin the exact upstream revision so the verified model cannot change underneath the app.
+        buildConfigField("String", "WHISPER_MODEL_URL", "\"https://huggingface.co/ggerganov/whisper.cpp/resolve/f281eb45af861ab5e5297d23694b7d46e090c02c/ggml-base.en-q5_1.bin\"")
+        buildConfigField("String", "WHISPER_MODEL_SHA256", "\"4baf70dd0d7c4247ba2b81fafd9c01005ac77c2f9ef064e00dcf195d0e2fdd2f\"")
     }
     buildFeatures { buildConfig = true }
     compileOptions {
