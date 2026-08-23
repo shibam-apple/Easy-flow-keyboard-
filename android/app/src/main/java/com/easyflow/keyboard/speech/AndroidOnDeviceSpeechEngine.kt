@@ -9,7 +9,10 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 
 class AndroidOnDeviceSpeechEngine(private val context: Context) : SpeechEngine, RecognitionListener {
-    override val id = "Android on-device"
+    private val hasOnDeviceService
+        get() = Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+    override val id: String
+        get() = if (hasOnDeviceService) "Fast on-device · live" else "Android speech · live"
     override val isReady: Boolean get() = SpeechRecognizer.isRecognitionAvailable(context)
     private var recognizer: SpeechRecognizer? = null
     private var listener: SpeechEngine.Listener? = null
@@ -17,7 +20,7 @@ class AndroidOnDeviceSpeechEngine(private val context: Context) : SpeechEngine, 
     override fun start(listener: SpeechEngine.Listener) {
         this.listener = listener
         cancel()
-        recognizer = if (Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
+        recognizer = if (hasOnDeviceService) {
             SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
         } else SpeechRecognizer.createSpeechRecognizer(context)
         recognizer?.setRecognitionListener(this)
@@ -39,7 +42,19 @@ class AndroidOnDeviceSpeechEngine(private val context: Context) : SpeechEngine, 
         best(results)?.let { listener?.onFinal(it, confidence) } ?: listener?.onError("No speech detected", true)
         listener?.onState(SpeechEngine.State.IDLE)
     }
-    override fun onError(error: Int) { listener?.onError("Speech recognizer error $error", true); listener?.onState(SpeechEngine.State.IDLE) }
+    override fun onError(error: Int) {
+        val message = when (error) {
+            SpeechRecognizer.ERROR_AUDIO -> "Microphone error · tap to retry"
+            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission required"
+            SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Speech service unavailable offline"
+            SpeechRecognizer.ERROR_NO_MATCH -> "I didn't catch that · tap to retry"
+            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer busy · tap again"
+            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech heard · tap to retry"
+            else -> "Speech service unavailable · error $error"
+        }
+        listener?.onError(message, true)
+        listener?.onState(SpeechEngine.State.IDLE)
+    }
     override fun onReadyForSpeech(params: Bundle?) = Unit
     override fun onBeginningOfSpeech() = Unit
     override fun onRmsChanged(rmsdB: Float) = Unit
