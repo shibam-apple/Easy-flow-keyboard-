@@ -7,8 +7,8 @@ android {
         applicationId = "com.easyflow.keyboard"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 4
+        versionName = "0.4.0"
         // Pin the exact upstream revision so the verified model cannot change underneath the app.
         buildConfigField("String", "WHISPER_MODEL_URL", "\"https://huggingface.co/ggerganov/whisper.cpp/resolve/f281eb45af861ab5e5297d23694b7d46e090c02c/ggml-base.en-q5_1.bin\"")
         buildConfigField("String", "WHISPER_MODEL_SHA256", "\"4baf70dd0d7c4247ba2b81fafd9c01005ac77c2f9ef064e00dcf195d0e2fdd2f\"")
