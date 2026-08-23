@@ -1,6 +1,8 @@
 # Easy Flow
 
-Easy Flow is a voice-first Android keyboard with a matching install-free web prototype. It has no QWERTY layout: speak, review the cleaned sentence, then insert it into any app.
+Easy Flow is a local-first Android voice keyboard with a matching install-free web prototype. It has no QWERTY layout: speak naturally, review the cleaned sentence, then insert it into any app.
+
+The Android app now supports a downloaded whisper.cpp `base.en` Q5_1 model for private on-device transcription. Until the model is installed it uses Android speech recognition, preferring the on-device service when the phone provides one.
 
 ## Try the web prototype
 
@@ -18,14 +20,15 @@ Chrome on Android supports live browser speech recognition. Other browsers autom
 4. Install `app-debug.apk` on the Android phone (allow installation from the browser/files app if Android asks).
 5. Open **Easy Flow**, tap **Enable Easy Flow**, enable it in Android's keyboard settings, then tap **Choose Easy Flow**.
 
-The APK uses Android's on-device/system `SpeechRecognizer`. Speech availability and whether audio leaves the device depend on the speech service installed on the phone.
+Open the app once after installation and select **Download local model**. The verified model is about 60 MB and remains in the app's private storage.
 
 ## Project structure
 
 - `web/` — instant, dependency-free web prototype
 - `android/` — native Kotlin Android keyboard
+- `ARCHITECTURE.md` — speech, correction, confidence, and privacy design
 - `.github/workflows/` — cloud APK build and GitHub Pages deployment
 
 ## Privacy
 
-The prototype stores no transcript history. The Android keyboard only keeps the current draft in memory and sends it to the focused text field when **Insert** is pressed.
+The prototype stores no transcript history. Local Whisper audio and drafts remain in memory, and the final text is sent to the focused field only when **Insert** is pressed.
