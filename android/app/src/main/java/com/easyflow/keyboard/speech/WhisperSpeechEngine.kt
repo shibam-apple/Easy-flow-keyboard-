@@ -33,11 +33,10 @@ class WhisperSpeechEngine(private val context: Context, private val models: Whis
         recorder?.startRecording(); listener.onState(SpeechEngine.State.LISTENING)
         captureJob = scope.launch {
             if (whisper == null) whisper = WhisperContext.createContextFromFile(models.modelFile.absolutePath)
-            val buffer = ShortArray(min / 2); var nextPreview = 16000 * 2
+            val buffer = ShortArray(min / 2)
             while (running) {
                 val count = recorder?.read(buffer, 0, buffer.size) ?: 0
                 if (count > 0) for (i in 0 until count) samples.add(buffer[i] / 32768f)
-                if (samples.size >= nextPreview) { transcribe(final = false); nextPreview = samples.size + 16000 * 2 }
             }
         }
     }
