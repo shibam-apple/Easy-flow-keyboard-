@@ -13,6 +13,11 @@ android {
         buildConfigField("String", "WHISPER_MODEL_SHA256", "\"323473b7c41bfb7fb994c1e9526abdcc7c55d3a909c8fa0c29f753005e87d372\"")
     }
     buildFeatures { buildConfig = true }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = "17" }
 }
 
 dependencies {
