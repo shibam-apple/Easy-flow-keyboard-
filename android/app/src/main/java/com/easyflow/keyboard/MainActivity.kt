@@ -78,7 +78,7 @@ class MainActivity : AppCompatActivity() {
             setSpan(ForegroundColorSpan(coral), 5, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         page.addView(text(title, 40f).apply { gravity = Gravity.CENTER })
-        page.addView(text("Local voice keyboard", 17f, secondary).apply {
+        page.addView(text("Fast voice keyboard", 17f, secondary).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(9), 0, dp(34))
         })
@@ -158,7 +158,7 @@ class MainActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             setPadding(0, dp(28), 0, dp(6))
         })
-        page.addView(text("Recordings and drafts are never saved.\nLocal Whisper works without sending audio away.", 13f, secondary).apply {
+        page.addView(text("Live transcription uses Android's on-device service when available.\nWhisper is an optional fully local fallback.", 13f, secondary).apply {
             gravity = Gravity.CENTER
             setLineSpacing(0f, 1.18f)
         })
@@ -205,9 +205,9 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             result.onSuccess {
-                modelStatus.text = "Whisper model ready"
-                modelDetail.text = "Private, fast, on-device transcription"
-                downloadButton.text = "Ready"
+                modelStatus.text = "Offline fallback installed"
+                modelDetail.text = "Fast live mode remains the default"
+                downloadButton.text = "Installed"
                 progress.visibility = View.GONE
             }.onFailure {
                 modelStatus.text = "Download interrupted"
@@ -220,14 +220,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshModel(models: WhisperModelManager) {
         if (models.isInstalled) {
-            modelStatus.text = "Whisper model ready"
-            modelDetail.text = "Private, fast, on-device transcription"
-            downloadButton.text = "Ready"
+            modelStatus.text = "Fast live mode ready"
+            modelDetail.text = "Optional Whisper fallback is installed"
+            downloadButton.text = "Installed"
             downloadButton.isEnabled = false
         } else {
-            modelStatus.text = "Install local Whisper"
-            modelDetail.text = "One-time download · about 60 MB"
-            downloadButton.text = "Download"
+            modelStatus.text = "Fast live mode ready"
+            modelDetail.text = "Optional: add offline Whisper · about 60 MB"
+            downloadButton.text = "Add offline"
             downloadButton.isEnabled = true
         }
     }
