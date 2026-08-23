@@ -182,7 +182,7 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         status.text = when (state) {
             SpeechEngine.State.IDLE -> if (processed == null) "Ready" else "Ready to insert"
             SpeechEngine.State.LISTENING -> "Listening"
-            SpeechEngine.State.PROCESSING -> "Cleaning your words…"
+            SpeechEngine.State.PROCESSING -> "Preparing transcript…"
         }
         mic.text = if (state == SpeechEngine.State.LISTENING) "■" else "●"
         mic.contentDescription = if (state == SpeechEngine.State.LISTENING) "Stop voice input" else "Start voice input"

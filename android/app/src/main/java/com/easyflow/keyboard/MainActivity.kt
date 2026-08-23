@@ -21,7 +21,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.lifecycleScope
-import com.easyflow.keyboard.speech.WhisperModelManager
+import com.easyflow.keyboard.speech.MoonshineModelManager
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -61,7 +61,7 @@ class MainActivity : AppCompatActivity() {
             window.decorView.systemUiVisibility =
                 View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         }
-        val models = WhisperModelManager(this)
+        val models = MoonshineModelManager(this)
 
         val page = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -78,7 +78,7 @@ class MainActivity : AppCompatActivity() {
             setSpan(ForegroundColorSpan(coral), 5, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         page.addView(text(title, 40f).apply { gravity = Gravity.CENTER })
-        page.addView(text("Fast voice keyboard", 17f, secondary).apply {
+        page.addView(text("Private AI voice keyboard", 17f, secondary).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(9), 0, dp(34))
         })
@@ -119,7 +119,7 @@ class MainActivity : AppCompatActivity() {
             marginStart = dp(18); marginEnd = dp(18); topMargin = dp(8)
         })
 
-        page.addView(text("▣   Audio stays on this phone", 14f, secondary).apply {
+        page.addView(text("▣   Transcription stays on this phone", 14f, secondary).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(22), 0, dp(28))
         })
@@ -158,7 +158,7 @@ class MainActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             setPadding(0, dp(28), 0, dp(6))
         })
-        page.addView(text("Live transcription uses Android's on-device service when available.\nWhisper is an optional fully local fallback.", 13f, secondary).apply {
+        page.addView(text("Moonshine streams words locally while you speak.\nAndroid speech stays available until the AI model is installed.", 13f, secondary).apply {
             gravity = Gravity.CENTER
             setLineSpacing(0f, 1.18f)
         })
@@ -193,41 +193,41 @@ class MainActivity : AppCompatActivity() {
         layoutParams = LinearLayout.LayoutParams(-1, dp(1)).apply { marginStart = dp(68); marginEnd = dp(12) }
     }
 
-    private fun downloadModel(models: WhisperModelManager) {
+    private fun downloadModel(models: MoonshineModelManager) {
         downloadButton.isEnabled = false
         progress.visibility = View.VISIBLE
         lifecycleScope.launch {
-            val result = models.download { percent ->
+            val result = models.download { percent, file ->
                 runOnUiThread {
                     progress.progress = percent
-                    modelStatus.text = "Downloading Whisper… $percent%"
-                    modelDetail.text = "Keep Easy Flow open"
+                    modelStatus.text = "Installing Moonshine AI… $percent%"
+                    modelDetail.text = if (file.isBlank()) "Preparing local model" else "Keep Easy Flow open · download resumes"
                 }
             }
             result.onSuccess {
-                modelStatus.text = "Offline fallback installed"
-                modelDetail.text = "Fast live mode remains the default"
-                downloadButton.text = "Installed"
+                modelStatus.text = "Moonshine AI ready"
+                modelDetail.text = "Small Streaming · fast, accurate and local"
+                downloadButton.text = "Ready"
                 progress.visibility = View.GONE
             }.onFailure {
                 modelStatus.text = "Download interrupted"
-                modelDetail.text = it.message ?: "Please try again"
-                downloadButton.text = "Retry"
+                modelDetail.text = "Your progress was saved · tap Resume"
+                downloadButton.text = "Resume"
                 downloadButton.isEnabled = true
             }
         }
     }
 
-    private fun refreshModel(models: WhisperModelManager) {
+    private fun refreshModel(models: MoonshineModelManager) {
         if (models.isInstalled) {
-            modelStatus.text = "Fast live mode ready"
-            modelDetail.text = "Optional Whisper fallback is installed"
-            downloadButton.text = "Installed"
+            modelStatus.text = "Moonshine AI ready"
+            modelDetail.text = "Small Streaming · private on-device AI"
+            downloadButton.text = "Ready"
             downloadButton.isEnabled = false
         } else {
-            modelStatus.text = "Fast live mode ready"
-            modelDetail.text = "Optional: add offline Whisper · about 60 MB"
-            downloadButton.text = "Add offline"
+            modelStatus.text = "Upgrade transcription"
+            modelDetail.text = "Install faster, more accurate local AI"
+            downloadButton.text = "Install AI"
             downloadButton.isEnabled = true
         }
     }

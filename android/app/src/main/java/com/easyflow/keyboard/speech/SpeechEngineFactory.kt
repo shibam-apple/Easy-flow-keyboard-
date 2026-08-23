@@ -3,15 +3,14 @@ package com.easyflow.keyboard.speech
 import android.content.Context
 
 class SpeechEngineFactory(private val context: Context) {
-    val models = WhisperModelManager(context)
+    val models = MoonshineModelManager(context)
     fun create(): SpeechEngine {
-        // Prefer Android's streaming recognizer even when Whisper is installed. On modern
-        // phones this is on-device, provides live partial text, and avoids repeatedly running
-        // a heavy model inside an IME process. Whisper remains the fully local fallback.
+        // Never block a keyboard on a first-run model download. Moonshine becomes the primary
+        // engine after setup; Android speech remains the instant, zero-setup fallback.
         val streaming = AndroidOnDeviceSpeechEngine(context)
         return when {
+            models.isInstalled -> MoonshineSpeechEngine(context, models)
             streaming.isReady -> streaming
-            models.isInstalled -> WhisperSpeechEngine(context, models)
             else -> streaming
         }
     }

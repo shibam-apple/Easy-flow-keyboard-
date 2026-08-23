@@ -7,13 +7,9 @@ android {
         applicationId = "com.easyflow.keyboard"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4.0"
-        // Pin the exact upstream revision so the verified model cannot change underneath the app.
-        buildConfigField("String", "WHISPER_MODEL_URL", "\"https://huggingface.co/ggerganov/whisper.cpp/resolve/f281eb45af861ab5e5297d23694b7d46e090c02c/ggml-base.en-q5_1.bin\"")
-        buildConfigField("String", "WHISPER_MODEL_SHA256", "\"4baf70dd0d7c4247ba2b81fafd9c01005ac77c2f9ef064e00dcf195d0e2fdd2f\"")
+        versionCode = 5
+        versionName = "0.5.0"
     }
-    buildFeatures { buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -26,6 +22,6 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-    if (project.findProject(":whisperlib") != null) implementation(project(":whisperlib"))
+    implementation("ai.moonshine:moonshine-voice:0.1.3")
     testImplementation("junit:junit:4.13.2")
 }
