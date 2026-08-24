@@ -284,6 +284,7 @@ class MainActivity : AppCompatActivity() {
                 downloadButton.text = "Ready"
                 progress.visibility = View.GONE
             }.onFailure {
+                models.markActiveUnhealthy()
                 modelStatus.text = "Download interrupted"
                 modelDetail.text = "Your progress was saved · tap Resume"
                 downloadButton.text = "Resume"
@@ -296,8 +297,8 @@ class MainActivity : AppCompatActivity() {
         if (models.isMediumInstalled) {
             modelStatus.text = "High accuracy ready"
             modelDetail.text = "Moonshine Medium · private on-device AI"
-            downloadButton.text = "Ready"
-            downloadButton.isEnabled = false
+            downloadButton.text = "Verify"
+            downloadButton.isEnabled = true
         } else if (models.isSmallInstalled) {
             modelStatus.text = "Compact AI active"
             modelDetail.text = "Install Medium for higher accuracy"
