@@ -9,10 +9,9 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.LayerDrawable
+import android.graphics.drawable.RippleDrawable
 import android.inputmethodservice.InputMethodService
 import android.os.SystemClock
-import android.util.TypedValue
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
@@ -20,8 +19,11 @@ import android.view.View
 import android.view.animation.PathInterpolator
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
+import android.content.res.ColorStateList
 import com.easyflow.keyboard.speech.SpeechEngine
 import com.easyflow.keyboard.speech.SpeechEngineFactory
 import com.easyflow.keyboard.text.ProcessedText
@@ -44,8 +46,12 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private lateinit var surface: FrameLayout
+    private lateinit var glassMaterial: LiquidGlassDrawable
     private lateinit var transcriptLens: FrameLayout
+    private lateinit var compactTranscriptScroll: HorizontalScrollView
     private lateinit var transcript: TextView
+    private lateinit var expandedTranscriptScroll: ScrollView
+    private lateinit var expandedTranscript: TextView
     private lateinit var status: TextView
     private lateinit var mic: Button
     private lateinit var backspace: Button
@@ -62,6 +68,7 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     private var expanded = false
     private var geometryAnimator: ValueAnimator? = null
     private var micPulse: AnimatorSet? = null
+    private var glassAnimator: ValueAnimator? = null
     private var refinementJob: Job? = null
     private var refinementGeneration = 0
     private var lastVisualUpdate = 0L
@@ -69,31 +76,20 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun lerp(a: Int, b: Int, p: Float) = (a + (b - a) * p).toInt()
 
-    private fun glass(radius: Int, inner: Boolean = false): Drawable {
-        val base = GradientDrawable(
-            GradientDrawable.Orientation.TL_BR,
-            if (inner) intArrayOf(0xf8ffffff.toInt(), 0xedfffafb.toInt(), 0xeff7fbff.toInt())
-            else intArrayOf(0xf4ffffff.toInt(), 0xeefeffff.toInt(), 0xf4ffffff.toInt()),
-        ).apply {
-            cornerRadius = dp(radius).toFloat()
-            setStroke(dp(1), if (inner) 0x99ffffff.toInt() else 0x88cfd7e5.toInt())
-        }
-        val refraction = GradientDrawable(
-            GradientDrawable.Orientation.LEFT_RIGHT,
-            intArrayOf(0x24ff765f, 0x08ffffff, 0x1f8fb9ff),
-        ).apply {
-            cornerRadius = dp(radius - 1).toFloat()
-            setStroke(dp(1), 0x55ffffff)
-        }
-        return LayerDrawable(arrayOf(base, refraction)).apply { setLayerInset(1, dp(1), dp(1), dp(1), dp(1)) }
-    }
-
     private fun circle(fill: Int, stroke: Int = 0x66ffffff): Drawable = GradientDrawable(
         GradientDrawable.Orientation.TL_BR,
         intArrayOf(fill, if (fill == coral) magenta else fill),
     ).apply {
         shape = GradientDrawable.OVAL
         setStroke(dp(1), stroke)
+    }
+
+    private fun overlayRipple(): Drawable {
+        val mask = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.WHITE)
+        }
+        return RippleDrawable(ColorStateList.valueOf(0x24ffffff), null, mask)
     }
 
     private fun control(symbol: String, description: String, color: Int, click: () -> Unit) = Button(this).apply {
@@ -105,8 +101,8 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         setTextColor(color)
         minWidth = 0; minimumWidth = 0; minHeight = 0; minimumHeight = 0
         setPadding(0, 0, 0, 0)
-        background = glass(24, true)
-        elevation = dp(2).toFloat()
+        background = overlayRipple()
+        elevation = 0f
         setOnClickListener {
             performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
             click()
@@ -123,8 +119,9 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
             setPadding(dp(9), dp(5), dp(9), dp(7))
             setBackgroundColor(Color.TRANSPARENT)
         }
+        glassMaterial = LiquidGlassDrawable(this, 28f)
         surface = FrameLayout(this).apply {
-            background = glass(28)
+            background = glassMaterial
             elevation = dp(13).toFloat()
             clipChildren = false
             clipToPadding = false
@@ -132,8 +129,9 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         root.addView(surface, LinearLayout.LayoutParams(-1, dp(62)))
 
         transcriptLens = FrameLayout(this).apply {
-            background = glass(22, true)
-            elevation = dp(3).toFloat()
+            background = null
+            elevation = 0f
+            clipChildren = true
             isClickable = true
             isFocusable = true
             contentDescription = "Expand live transcript"
@@ -147,10 +145,36 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
             includeFontPadding = false
             gravity = Gravity.CENTER_VERTICAL
             maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.START
+            isSingleLine = true
             setPadding(dp(13), 0, dp(13), 0)
         }
-        transcriptLens.addView(transcript, FrameLayout.LayoutParams(-1, -1))
+        compactTranscriptScroll = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            isFillViewport = true
+            addView(transcript, FrameLayout.LayoutParams(-2, -1))
+            setOnClickListener { setExpanded(true) }
+        }
+        transcriptLens.addView(compactTranscriptScroll, FrameLayout.LayoutParams(-1, -1))
+
+        expandedTranscript = TextView(this).apply {
+            text = transcript.text
+            setTextColor(ink)
+            textSize = 17f
+            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+            includeFontPadding = false
+            gravity = Gravity.BOTTOM
+            setLineSpacing(0f, 1.14f)
+            setPadding(dp(17), dp(12), dp(17), dp(12))
+        }
+        expandedTranscriptScroll = ScrollView(this).apply {
+            isVerticalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            alpha = 0f
+            addView(expandedTranscript, FrameLayout.LayoutParams(-1, -2))
+            setOnClickListener { setExpanded(false) }
+        }
+        transcriptLens.addView(expandedTranscriptScroll, FrameLayout.LayoutParams(-1, -1))
         surface.addView(transcriptLens)
 
         status = TextView(this).apply {
@@ -200,11 +224,10 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         status.alpha = p
         collapse.alpha = p
         collapse.isEnabled = p > .8f
-        transcript.maxLines = if (p > .22f) 4 else 1
-        transcript.ellipsize = if (p > .22f) null else android.text.TextUtils.TruncateAt.START
-        transcript.gravity = if (p > .22f) Gravity.BOTTOM else Gravity.CENTER_VERTICAL
-        transcript.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f + 3f * p)
-        transcript.setPadding(lerp(dp(13), dp(17), p), lerp(0, dp(12), p), lerp(dp(13), dp(17), p), lerp(0, dp(12), p))
+        compactTranscriptScroll.alpha = (1f - p * 2.2f).coerceIn(0f, 1f)
+        expandedTranscriptScroll.alpha = ((p - .22f) * 1.7f).coerceIn(0f, 1f)
+        compactTranscriptScroll.isEnabled = p < .45f
+        expandedTranscriptScroll.isEnabled = p > .55f
     }
 
     private fun place(view: View, x: Int, y: Int, width: Int, height: Int) {
@@ -310,13 +333,23 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     private fun showTranscript(value: String, provisional: Boolean) {
         if (transcript.text.toString() == value) return
         transcript.text = value
+        expandedTranscript.text = value
         transcript.setTextColor(if (provisional) 0xff666871.toInt() else ink)
+        expandedTranscript.setTextColor(if (provisional) 0xff666871.toInt() else ink)
+        compactTranscriptScroll.post {
+            val target = (transcript.width - compactTranscriptScroll.width).coerceAtLeast(0)
+            compactTranscriptScroll.smoothScrollTo(target, 0)
+        }
+        expandedTranscriptScroll.post {
+            val target = (expandedTranscript.height - expandedTranscriptScroll.height).coerceAtLeast(0)
+            expandedTranscriptScroll.smoothScrollTo(0, target)
+        }
         val now = SystemClock.uptimeMillis()
         if (now - lastVisualUpdate > 70) {
-            transcript.animate().cancel()
-            transcript.alpha = .84f
-            transcript.translationY = dp(3).toFloat()
-            transcript.animate().alpha(1f).translationY(0f).setDuration(150).start()
+            expandedTranscript.animate().cancel()
+            expandedTranscript.alpha = .82f
+            expandedTranscript.translationY = dp(3).toFloat()
+            expandedTranscript.animate().alpha(1f).translationY(0f).setDuration(170).start()
             lastVisualUpdate = now
         }
     }
@@ -329,10 +362,21 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
             it.duration = 720; it.repeatCount = ValueAnimator.INFINITE; it.repeatMode = ValueAnimator.REVERSE
         }
         micPulse = AnimatorSet().apply { playTogether(scaleX, scaleY); start() }
+        glassAnimator?.cancel()
+        glassAnimator = ValueAnimator.ofFloat(.12f, .88f).apply {
+            duration = 2100
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.REVERSE
+            interpolator = PathInterpolator(.32f, 0f, .2f, 1f)
+            addUpdateListener { glassMaterial.highlightPhase = it.animatedValue as Float }
+            start()
+        }
     }
 
     private fun stopMicPulse() {
         micPulse?.cancel(); micPulse = null
+        glassAnimator?.cancel(); glassAnimator = null
+        if (::glassMaterial.isInitialized) glassMaterial.highlightPhase = .18f
         if (::mic.isInitialized) mic.animate().scaleX(1f).scaleY(1f).setDuration(140).start()
     }
 
