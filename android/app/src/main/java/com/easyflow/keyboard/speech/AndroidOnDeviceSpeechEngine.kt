@@ -11,6 +11,7 @@ import android.speech.SpeechRecognizer
 class AndroidOnDeviceSpeechEngine(private val context: Context) : SpeechEngine, RecognitionListener {
     private val hasOnDeviceService
         get() = Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+    val isGuaranteedOnDevice: Boolean get() = hasOnDeviceService
     override val id: String
         get() = if (hasOnDeviceService) "Fast on-device · live" else "Android speech · live"
     override val isReady: Boolean get() = SpeechRecognizer.isRecognitionAvailable(context)
@@ -18,8 +19,8 @@ class AndroidOnDeviceSpeechEngine(private val context: Context) : SpeechEngine, 
     private var listener: SpeechEngine.Listener? = null
 
     override fun start(listener: SpeechEngine.Listener) {
-        this.listener = listener
         cancel()
+        this.listener = listener
         recognizer = if (hasOnDeviceService) {
             SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
         } else SpeechRecognizer.createSpeechRecognizer(context)
@@ -34,7 +35,7 @@ class AndroidOnDeviceSpeechEngine(private val context: Context) : SpeechEngine, 
     }
 
     override fun stop() { recognizer?.stopListening(); listener?.onState(SpeechEngine.State.PROCESSING) }
-    override fun cancel() { recognizer?.cancel(); recognizer?.destroy(); recognizer = null }
+    override fun cancel() { recognizer?.cancel(); recognizer?.destroy(); recognizer = null; listener = null }
     private fun best(bundle: Bundle?) = bundle?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
     override fun onPartialResults(results: Bundle?) { best(results)?.let { listener?.onPartial(it, .55f) } }
     override fun onResults(results: Bundle?) {
