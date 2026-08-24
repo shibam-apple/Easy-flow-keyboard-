@@ -19,9 +19,7 @@ import android.view.View
 import android.view.animation.PathInterpolator
 import android.widget.Button
 import android.widget.FrameLayout
-import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import android.content.res.ColorStateList
 import com.easyflow.keyboard.speech.SpeechEngine
@@ -48,10 +46,7 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     private lateinit var surface: FrameLayout
     private lateinit var glassMaterial: LiquidGlassDrawable
     private lateinit var transcriptLens: FrameLayout
-    private lateinit var compactTranscriptScroll: HorizontalScrollView
     private lateinit var transcript: TextView
-    private lateinit var expandedTranscriptScroll: ScrollView
-    private lateinit var expandedTranscript: TextView
     private lateinit var status: TextView
     private lateinit var mic: Button
     private lateinit var backspace: Button
@@ -145,36 +140,10 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
             includeFontPadding = false
             gravity = Gravity.CENTER_VERTICAL
             maxLines = 1
-            isSingleLine = true
+            ellipsize = android.text.TextUtils.TruncateAt.START
             setPadding(dp(13), 0, dp(13), 0)
         }
-        compactTranscriptScroll = HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            overScrollMode = View.OVER_SCROLL_NEVER
-            isFillViewport = true
-            addView(transcript, FrameLayout.LayoutParams(-2, -1))
-            setOnClickListener { setExpanded(true) }
-        }
-        transcriptLens.addView(compactTranscriptScroll, FrameLayout.LayoutParams(-1, -1))
-
-        expandedTranscript = TextView(this).apply {
-            text = transcript.text
-            setTextColor(ink)
-            textSize = 17f
-            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-            includeFontPadding = false
-            gravity = Gravity.BOTTOM
-            setLineSpacing(0f, 1.14f)
-            setPadding(dp(17), dp(12), dp(17), dp(12))
-        }
-        expandedTranscriptScroll = ScrollView(this).apply {
-            isVerticalScrollBarEnabled = false
-            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
-            alpha = 0f
-            addView(expandedTranscript, FrameLayout.LayoutParams(-1, -2))
-            setOnClickListener { setExpanded(false) }
-        }
-        transcriptLens.addView(expandedTranscriptScroll, FrameLayout.LayoutParams(-1, -1))
+        transcriptLens.addView(transcript, FrameLayout.LayoutParams(-1, -1))
         surface.addView(transcriptLens)
 
         status = TextView(this).apply {
@@ -224,10 +193,11 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         status.alpha = p
         collapse.alpha = p
         collapse.isEnabled = p > .8f
-        compactTranscriptScroll.alpha = (1f - p * 2.2f).coerceIn(0f, 1f)
-        expandedTranscriptScroll.alpha = ((p - .22f) * 1.7f).coerceIn(0f, 1f)
-        compactTranscriptScroll.isEnabled = p < .45f
-        expandedTranscriptScroll.isEnabled = p > .55f
+        transcript.maxLines = if (p > .22f) 4 else 1
+        transcript.ellipsize = if (p > .22f) null else android.text.TextUtils.TruncateAt.START
+        transcript.gravity = if (p > .22f) Gravity.BOTTOM else Gravity.CENTER_VERTICAL
+        transcript.textSize = 14f + 3f * p
+        transcript.setPadding(lerp(dp(13), dp(17), p), lerp(0, dp(12), p), lerp(dp(13), dp(17), p), lerp(0, dp(12), p))
     }
 
     private fun place(view: View, x: Int, y: Int, width: Int, height: Int) {
@@ -338,23 +308,13 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     private fun showTranscript(value: String, provisional: Boolean) {
         if (transcript.text.toString() == value) return
         transcript.text = value
-        expandedTranscript.text = value
         transcript.setTextColor(if (provisional) 0xff666871.toInt() else ink)
-        expandedTranscript.setTextColor(if (provisional) 0xff666871.toInt() else ink)
-        compactTranscriptScroll.post {
-            val target = (transcript.width - compactTranscriptScroll.width).coerceAtLeast(0)
-            compactTranscriptScroll.smoothScrollTo(target, 0)
-        }
-        expandedTranscriptScroll.post {
-            val target = (expandedTranscript.height - expandedTranscriptScroll.height).coerceAtLeast(0)
-            expandedTranscriptScroll.smoothScrollTo(0, target)
-        }
         val now = SystemClock.uptimeMillis()
         if (now - lastVisualUpdate > 70) {
-            expandedTranscript.animate().cancel()
-            expandedTranscript.alpha = .82f
-            expandedTranscript.translationY = dp(3).toFloat()
-            expandedTranscript.animate().alpha(1f).translationY(0f).setDuration(170).start()
+            transcript.animate().cancel()
+            transcript.alpha = .84f
+            transcript.translationY = dp(2).toFloat()
+            transcript.animate().alpha(1f).translationY(0f).setDuration(150).start()
             lastVisualUpdate = now
         }
     }
