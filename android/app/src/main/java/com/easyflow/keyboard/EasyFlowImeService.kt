@@ -100,7 +100,8 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         setImageResource(icon)
         contentDescription = description
         scaleType = ImageView.ScaleType.CENTER
-        minWidth = 0; minimumWidth = 0; minHeight = 0; minimumHeight = 0
+        minimumWidth = 0
+        minimumHeight = 0
         setPadding(0, 0, 0, 0)
         background = null
         foreground = overlayRipple()
