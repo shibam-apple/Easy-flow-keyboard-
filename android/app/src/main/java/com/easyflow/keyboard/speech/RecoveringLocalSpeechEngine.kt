@@ -5,6 +5,7 @@ import android.os.Looper
 
 /** Restarts a stalled Moonshine native session once without leaving the device. */
 class RecoveringLocalSpeechEngine(
+    private val onTerminalFailure: () -> Unit,
     private val createEngine: () -> SpeechEngine,
 ) : SpeechEngine {
     private val main = Handler(Looper.getMainLooper())
@@ -59,7 +60,10 @@ class RecoveringLocalSpeechEngine(
             override fun onError(message: String, recoverable: Boolean) {
                 if (!current()) return
                 if (recoverable && attempt == 0) retry(token)
-                else client?.onError(message, recoverable)
+                else {
+                    onTerminalFailure()
+                    client?.onError(message, recoverable)
+                }
             }
         })
 
@@ -68,6 +72,7 @@ class RecoveringLocalSpeechEngine(
             if (attempt == 0) retry(token)
             else {
                 active.cancel()
+                onTerminalFailure()
                 client?.onError("Local model is not responding · repair Moonshine in Easy Flow", false)
                 client?.onState(SpeechEngine.State.IDLE)
             }
