@@ -44,7 +44,7 @@ class GemmaTextRefiner(context: Context) {
                 samplerConfig = SamplerConfig(topK = 1, topP = 0.1, temperature = 0.0),
             )
             readyEngine().createConversation(config).use { conversation ->
-                conversation.sendMessage(prompt).text.trim().takeIf { it.isNotBlank() }
+                conversation.sendMessage(prompt).contents.toString().trim().takeIf { it.isNotBlank() }
             }
         }
     }
