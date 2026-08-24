@@ -11,7 +11,7 @@ class MoonshineSpeechEngine(
     context: Context,
     private val models: MoonshineModelManager,
 ) : SpeechEngine {
-    override val id = "Moonshine Small · local"
+    override val id: String get() = "${models.activeName} · local"
     override val isReady: Boolean get() = models.isInstalled
 
     private val appContext = context.applicationContext
@@ -24,6 +24,11 @@ class MoonshineSpeechEngine(
     private var currentLine = ""
     private var stopping = false
     private var finalized = false
+    private var contextHint = ""
+
+    override fun setContext(hint: String) {
+        contextHint = hint.takeLast(600)
+    }
 
     override fun start(listener: SpeechEngine.Listener) {
         cancel()
@@ -44,7 +49,7 @@ class MoonshineSpeechEngine(
             try {
                 val transcriber = MicTranscriber(appContext)
                     .language("en")
-                    .modelArch(MoonshineModelManager.MODEL_ARCH)
+                    .modelArch(models.activeArch)
                     .onText { text ->
                         if (token != session || finalized) return@onText
                         currentLine = text.trim()
@@ -79,6 +84,9 @@ class MoonshineSpeechEngine(
                     return@execute
                 }
                 mic = transcriber
+                if (contextHint.isNotBlank()) {
+                    runCatching { transcriber.setContext(contextHint, 32) }
+                }
                 transcriber.start()
                 main.post {
                     if (token == session) this.listener?.onState(SpeechEngine.State.LISTENING)

@@ -8,23 +8,28 @@ import kotlinx.coroutines.withContext
 
 class MoonshineModelManager(context: Context) {
     companion object {
-        const val MODEL_ARCH = JNI.MOONSHINE_MODEL_ARCH_SMALL_STREAMING
+        const val MEDIUM_ARCH = JNI.MOONSHINE_MODEL_ARCH_MEDIUM_STREAMING
+        const val SMALL_ARCH = JNI.MOONSHINE_MODEL_ARCH_SMALL_STREAMING
         private const val PREFS = "moonshine_model"
-        private const val READY = "small_streaming_ready"
+        private const val MEDIUM_READY = "medium_streaming_ready"
+        private const val SMALL_READY = "small_streaming_ready"
     }
 
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    val isInstalled: Boolean
-        get() = preferences.getBoolean(READY, false)
+    val isMediumInstalled: Boolean get() = preferences.getBoolean(MEDIUM_READY, false)
+    val isSmallInstalled: Boolean get() = preferences.getBoolean(SMALL_READY, false)
+    val isInstalled: Boolean get() = isMediumInstalled || isSmallInstalled
+    val activeArch: Int get() = if (isMediumInstalled) MEDIUM_ARCH else SMALL_ARCH
+    val activeName: String get() = if (isMediumInstalled) "Moonshine Medium" else "Moonshine Small"
 
     suspend fun download(onProgress: (Int, String) -> Unit): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val transcriber = MicTranscriber(appContext)
                     .language("en")
-                    .modelArch(MODEL_ARCH)
+                    .modelArch(MEDIUM_ARCH)
                     .onProgress { fraction, file ->
                         onProgress((fraction * 100).toInt().coerceIn(0, 100), file)
                     }
@@ -32,7 +37,7 @@ class MoonshineModelManager(context: Context) {
                     // The library resumes .part files and validates that every required model
                     // asset exists before load() succeeds.
                     transcriber.load()
-                    preferences.edit().putBoolean(READY, true).apply()
+                    preferences.edit().putBoolean(MEDIUM_READY, true).apply()
                 } finally {
                     transcriber.close()
                 }

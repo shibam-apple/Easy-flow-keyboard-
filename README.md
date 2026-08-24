@@ -2,7 +2,7 @@
 
 Easy Flow is a local-first Android voice keyboard with a matching install-free web prototype. It has no QWERTY layout: speak naturally, review the cleaned sentence, then insert it into any app.
 
-The Android app uses Moonshine v2 Small Streaming for fast, private, on-device transcription with live partial text. Until the model is installed it uses Android speech recognition, preferring the on-device service when the phone provides one.
+The Android app uses Moonshine v2 Medium Streaming for its highest-accuracy private, on-device transcription with live partial text. Existing Small installations remain a compact fallback; until either model is installed it uses Android speech recognition.
 
 ## Try the web prototype
 

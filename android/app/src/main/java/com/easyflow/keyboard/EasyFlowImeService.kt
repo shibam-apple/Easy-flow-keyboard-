@@ -17,6 +17,7 @@ import com.easyflow.keyboard.speech.SpeechEngineFactory
 import com.easyflow.keyboard.text.FlowTextProcessor
 import com.easyflow.keyboard.text.ProcessedText
 import com.easyflow.keyboard.text.TranscriptStabilizer
+import com.easyflow.keyboard.text.WritingContext
 
 class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     private val coral = 0xffff4f59.toInt()
@@ -33,6 +34,7 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     private var processed: ProcessedText? = null
     private var lastInserted = ""
     private var state = SpeechEngine.State.IDLE
+    private var writingContext = WritingContext()
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun panel(radius: Int, fill: Int = 0xf7ffffff.toInt(), stroke: Int = hairline) =
@@ -150,6 +152,10 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
             status.text = "Open Easy Flow to allow microphone"
             return
         }
+        val beforeCursor = currentInputConnection?.getTextBeforeCursor(600, 0)?.toString().orEmpty()
+        val appPackage = currentInputEditorInfo?.packageName.orEmpty()
+        writingContext = WritingContext(beforeCursor, appPackage)
+        engine.setContext("App: $appPackage\nText before cursor: $beforeCursor")
         stabilizer.reset(); processed = null; engine.start(this)
     }
 
@@ -194,7 +200,7 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     }
 
     override fun onFinal(text: String, confidence: Float) = runOnMain {
-        processed = processor.process(text, confidence)
+        processed = processor.process(text, confidence, writingContext)
         transcript.text = processed!!.text
         detail.text = when {
             processed!!.requiresReview -> "Review suggested · ${processed!!.changes.joinToString()}"

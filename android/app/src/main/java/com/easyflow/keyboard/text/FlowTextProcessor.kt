@@ -10,12 +10,21 @@ data class ProcessedText(
     val requiresReview: Boolean
 )
 
+data class WritingContext(
+    val textBeforeCursor: String = "",
+    val appPackage: String = "",
+)
+
 class FlowTextProcessor(private val dictionary: PersonalDictionary = PersonalDictionary.EMPTY) {
     private val fillers = Regex("(?i)(^|[\\s,])(um+|uh+|erm+|hmm+)(?=[\\s,.!?]|$)")
     private val backtrack = Regex("(?i)\\b(.{1,80}?)(?:[, ]+)(?:actually|sorry|I mean|rather)(?:[, ]+)(.{1,80}?)(?=\\.|,|$)")
     private val spaces = Regex("\\s+")
 
-    fun process(rawInput: String, asrConfidence: Float = .7f): ProcessedText {
+    fun process(
+        rawInput: String,
+        asrConfidence: Float = .7f,
+        context: WritingContext = WritingContext(),
+    ): ProcessedText {
         val changes = mutableListOf<String>()
         var text = rawInput.trim()
         val withoutFillers = text.replace(fillers, " ").replace(spaces, " ").trim()
@@ -32,7 +41,7 @@ class FlowTextProcessor(private val dictionary: PersonalDictionary = PersonalDic
         val dictionaryResult = dictionary.apply(text)
         if (dictionaryResult != text) { text = dictionaryResult; changes += "Applied personal dictionary" }
         text = formatSpokenStructure(text).also { if (it != text) changes += "Formatted structure" }
-        text = punctuate(text)
+        text = punctuate(text, context)
         val risk = semanticRisk(rawInput, text)
         val confidence = (asrConfidence - risk + if (changes.isEmpty()) .08f else 0f).coerceIn(0f, 1f)
         return ProcessedText(rawInput, text, confidence, changes.distinct(), confidence < .66f || risk > .18f)
@@ -46,13 +55,33 @@ class FlowTextProcessor(private val dictionary: PersonalDictionary = PersonalDic
         return text
     }
 
-    private fun punctuate(input: String): String {
+    private fun punctuate(input: String, context: WritingContext): String {
         var text = input.trim().replace(Regex("\\s+([,.!?])"), "$1")
         if (text.isBlank()) return text
-        text = text.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
-        if (text.last() !in ".!?") text += "."
+
+        val previous = context.textBeforeCursor.trimEnd()
+        val startsSentence = previous.isEmpty() || previous.last() in ".!?\n"
+        text = if (startsSentence) {
+            capitalizeParagraphs(text)
+        } else {
+            text.replaceFirstChar { if (it.isUpperCase()) it.lowercase(Locale.getDefault()) else it.toString() }
+        }
+
+        val casualApp = listOf(
+            "com.whatsapp", "org.telegram", "org.thoughtcrime.securesms",
+            "com.discord", "com.instagram", "com.Slack", "com.twitter", "com.x",
+        ).any { context.appPackage.contains(it, ignoreCase = true) }
+        if (!casualApp && text.last() !in ".!?") text += "."
         return text
     }
+
+    private fun capitalizeParagraphs(input: String): String = input
+        .split('\n')
+        .joinToString("\n") { line ->
+            line.replaceFirstChar {
+                if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
+            }
+        }
 
     private fun semanticRisk(raw: String, cleaned: String): Float {
         val rawNumbers = Regex("\\b\\d+(?:[.:]\\d+)?\\b").findAll(raw).map { it.value }.toSet()

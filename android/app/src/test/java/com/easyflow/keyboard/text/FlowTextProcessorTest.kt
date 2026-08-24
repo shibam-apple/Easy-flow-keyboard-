@@ -21,4 +21,22 @@ class FlowTextProcessorTest {
     @Test fun formatsParagraphCommand() {
         assertEquals("Hello\n\nWorld.", processor.process("hello new paragraph world", .9f).text)
     }
+
+    @Test fun usesSurroundingTextForMidSentenceCapitalization() {
+        val result = processor.process(
+            "This continues the thought",
+            .9f,
+            WritingContext("The beginning of ", "com.example.notes"),
+        )
+        assertEquals("this continues the thought.", result.text)
+    }
+
+    @Test fun omitsTrailingPeriodInMessagingApps() {
+        val result = processor.process(
+            "see you soon",
+            .9f,
+            WritingContext(appPackage = "com.whatsapp"),
+        )
+        assertEquals("See you soon", result.text)
+    }
 }

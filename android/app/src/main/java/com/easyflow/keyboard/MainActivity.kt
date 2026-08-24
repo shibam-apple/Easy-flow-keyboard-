@@ -78,7 +78,7 @@ class MainActivity : AppCompatActivity() {
             setSpan(ForegroundColorSpan(coral), 5, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         page.addView(text(title, 40f).apply { gravity = Gravity.CENTER })
-        page.addView(text("Private AI voice keyboard", 17f, secondary).apply {
+        page.addView(text("High-accuracy local voice keyboard", 17f, secondary).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(9), 0, dp(34))
         })
@@ -158,7 +158,7 @@ class MainActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             setPadding(0, dp(28), 0, dp(6))
         })
-        page.addView(text("Moonshine streams words locally while you speak.\nAndroid speech stays available until the AI model is installed.", 13f, secondary).apply {
+        page.addView(text("Moonshine Medium streams entirely on your phone.\nNo recordings or transcripts are sent to a server.", 13f, secondary).apply {
             gravity = Gravity.CENTER
             setLineSpacing(0f, 1.18f)
         })
@@ -200,13 +200,13 @@ class MainActivity : AppCompatActivity() {
             val result = models.download { percent, file ->
                 runOnUiThread {
                     progress.progress = percent
-                    modelStatus.text = "Installing Moonshine AI… $percent%"
+                    modelStatus.text = "Installing Medium AI… $percent%"
                     modelDetail.text = if (file.isBlank()) "Preparing local model" else "Keep Easy Flow open · download resumes"
                 }
             }
             result.onSuccess {
-                modelStatus.text = "Moonshine AI ready"
-                modelDetail.text = "Small Streaming · fast, accurate and local"
+                modelStatus.text = "High accuracy ready"
+                modelDetail.text = "Moonshine Medium · entirely on-device"
                 downloadButton.text = "Ready"
                 progress.visibility = View.GONE
             }.onFailure {
@@ -219,15 +219,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshModel(models: MoonshineModelManager) {
-        if (models.isInstalled) {
-            modelStatus.text = "Moonshine AI ready"
-            modelDetail.text = "Small Streaming · private on-device AI"
+        if (models.isMediumInstalled) {
+            modelStatus.text = "High accuracy ready"
+            modelDetail.text = "Moonshine Medium · private on-device AI"
             downloadButton.text = "Ready"
             downloadButton.isEnabled = false
+        } else if (models.isSmallInstalled) {
+            modelStatus.text = "Compact AI active"
+            modelDetail.text = "Install Medium for higher accuracy"
+            downloadButton.text = "Upgrade"
+            downloadButton.isEnabled = true
         } else {
-            modelStatus.text = "Upgrade transcription"
-            modelDetail.text = "Install faster, more accurate local AI"
-            downloadButton.text = "Install AI"
+            modelStatus.text = "Install local transcription"
+            modelDetail.text = "Medium Streaming · best local accuracy"
+            downloadButton.text = "Install"
             downloadButton.isEnabled = true
         }
     }
