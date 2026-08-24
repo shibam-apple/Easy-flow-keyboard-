@@ -17,8 +17,9 @@ import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.View
 import android.view.animation.PathInterpolator
-import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.content.res.ColorStateList
@@ -48,10 +49,9 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     private lateinit var transcriptLens: FrameLayout
     private lateinit var transcript: TextView
     private lateinit var status: TextView
-    private lateinit var mic: Button
-    private lateinit var backspace: Button
-    private lateinit var enter: Button
-    private lateinit var collapse: Button
+    private lateinit var mic: ImageButton
+    private lateinit var backspace: ImageButton
+    private lateinit var enter: ImageButton
     private lateinit var engine: SpeechEngine
     private lateinit var pipeline: TranscriptRefinementPipeline
 
@@ -87,16 +87,23 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         return RippleDrawable(ColorStateList.valueOf(0x24ffffff), null, mask)
     }
 
-    private fun control(symbol: String, description: String, color: Int, click: () -> Unit) = Button(this).apply {
-        text = symbol
+    private fun transcriptLensBackground(): Drawable = GradientDrawable(
+        GradientDrawable.Orientation.TOP_BOTTOM,
+        intArrayOf(0x33da6868, 0x33eedfdf),
+    ).apply {
+        shape = GradientDrawable.RECTANGLE
+        cornerRadius = dp(21).toFloat()
+        setStroke(dp(1), 0x3dffffff)
+    }
+
+    private fun control(icon: Int, description: String, click: () -> Unit) = ImageButton(this).apply {
+        setImageResource(icon)
         contentDescription = description
-        isAllCaps = false
-        textSize = 22f
-        typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-        setTextColor(color)
+        scaleType = ImageView.ScaleType.CENTER
         minWidth = 0; minimumWidth = 0; minHeight = 0; minimumHeight = 0
         setPadding(0, 0, 0, 0)
-        background = overlayRipple()
+        background = null
+        foreground = overlayRipple()
         elevation = 0f
         setOnClickListener {
             performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
@@ -111,20 +118,21 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(9), dp(5), dp(9), dp(7))
+            // On a 390 dp phone this produces the reference's 376 dp capsule.
+            setPadding(dp(7), dp(4), dp(7), dp(6))
             setBackgroundColor(Color.TRANSPARENT)
         }
-        glassMaterial = LiquidGlassDrawable(this, 28f)
+        glassMaterial = LiquidGlassDrawable(this, 37f)
         surface = FrameLayout(this).apply {
             background = glassMaterial
-            elevation = dp(13).toFloat()
+            elevation = dp(10).toFloat()
             clipChildren = false
             clipToPadding = false
         }
-        root.addView(surface, LinearLayout.LayoutParams(-1, dp(62)))
+        root.addView(surface, LinearLayout.LayoutParams(-1, dp(74)))
 
         transcriptLens = FrameLayout(this).apply {
-            background = null
+            background = transcriptLensBackground()
             elevation = 0f
             clipChildren = true
             isClickable = true
@@ -135,13 +143,13 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         transcript = TextView(this).apply {
             text = "Tap the microphone and speak"
             setTextColor(ink)
-            textSize = 14f
+            textSize = 15f
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
             includeFontPadding = false
             gravity = Gravity.CENTER_VERTICAL
             maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.START
-            setPadding(dp(13), 0, dp(13), 0)
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setPadding(dp(12), 0, dp(12), 0)
         }
         transcriptLens.addView(transcript, FrameLayout.LayoutParams(-1, -1))
         surface.addView(transcriptLens)
@@ -156,15 +164,18 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         }
         surface.addView(status)
 
-        mic = control("≋", "Start voice input", Color.WHITE) { toggleListening() }.apply {
-            background = circle(coral)
-            textSize = 24f
-            elevation = dp(7).toFloat()
+        mic = control(R.drawable.ic_easyflow_mic, "Start voice input") { toggleListening() }.apply {
+            background = circle(0xb3eb191d.toInt())
+            elevation = dp(5).toFloat()
         }
-        backspace = control("⌫", "Backspace", ink) { deleteOneCharacter() }
-        enter = control("↵", "Enter", mint) { pressEnter() }
-        collapse = control("⌄", "Collapse transcript", graphite) { setExpanded(false) }.apply { alpha = 0f }
-        surface.addView(mic); surface.addView(backspace); surface.addView(enter); surface.addView(collapse)
+        backspace = control(R.drawable.ic_easyflow_backspace, "Backspace") { deleteOneCharacter() }.apply {
+            background = LiquidGlassDrawable(this@EasyFlowImeService, 22f)
+            alpha = 0f
+        }
+        enter = control(R.drawable.ic_easyflow_enter, "Enter") { pressEnter() }.apply {
+            background = LiquidGlassDrawable(this@EasyFlowImeService, 22f)
+        }
+        surface.addView(mic); surface.addView(backspace); surface.addView(enter)
 
         surface.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyGeometry(expansion) }
         surface.post { applyGeometry(0f) }
@@ -175,29 +186,32 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     private fun applyGeometry(p: Float) {
         if (!::surface.isInitialized || surface.width == 0) return
         expansion = p
+        glassMaterial.expansion = p
         val w = surface.width
-        val compact = dp(40)
-        val gap = dp(5)
-        val right = dp(8)
-        val controlsWidth = compact * 3 + gap * 2
-        val compactMicX = w - right - controlsWidth
-        val lensRight = compactMicX - dp(6)
+        val control = dp(44)
+        val gap = dp(11)
+        val right = dp(13)
+        val compactEnterX = w - right - control
+        val compactMicX = compactEnterX - gap - control
+        val lensX = dp(14)
+        val lensRight = compactMicX - gap
+        val expandedBackspaceX = w - right - control * 2 - gap
 
-        place(transcriptLens, lerp(dp(8), dp(14), p), lerp(dp(10), dp(14), p),
-            lerp((lensRight - dp(8)).coerceAtLeast(dp(80)), w - dp(28), p), lerp(dp(42), dp(104), p))
-        place(mic, lerp(compactMicX, w / 2 - dp(32), p), lerp(dp(11), dp(146), p), lerp(compact, dp(64), p), lerp(compact, dp(64), p))
-        place(backspace, lerp(compactMicX + compact + gap, w / 2 - dp(106), p), lerp(dp(11), dp(154), p), lerp(compact, dp(48), p), lerp(compact, dp(48), p))
-        place(enter, lerp(compactMicX + (compact + gap) * 2, w / 2 + dp(57), p), lerp(dp(11), dp(154), p), lerp(compact, dp(48), p), lerp(compact, dp(48), p))
-        place(status, dp(12), dp(122), w - dp(24), dp(20))
-        place(collapse, w - dp(50), dp(158), dp(38), dp(38))
+        // Compact geometry is a direct dp translation of Frame.svg.
+        place(transcriptLens, lerp(lensX, dp(14), p), lerp(dp(16), dp(12), p),
+            lerp((lensRight - lensX).coerceAtLeast(dp(96)), w - dp(28), p), lerp(dp(42), dp(106), p))
+        place(mic, lerp(compactMicX, dp(14), p), lerp(dp(16), dp(134), p), control, control)
+        place(backspace, expandedBackspaceX, dp(134), control, control)
+        place(enter, lerp(compactEnterX, compactEnterX, p), lerp(dp(16), dp(134), p), control, control)
+        place(status, dp(68), dp(146), (expandedBackspaceX - dp(78)).coerceAtLeast(dp(72)), dp(18))
         status.alpha = p
-        collapse.alpha = p
-        collapse.isEnabled = p > .8f
-        transcript.maxLines = if (p > .22f) 4 else 1
-        transcript.ellipsize = if (p > .22f) null else android.text.TextUtils.TruncateAt.START
+        backspace.alpha = p
+        backspace.isEnabled = p > .8f
+        transcript.maxLines = if (p > .22f) 3 else 1
+        transcript.ellipsize = if (p > .22f) null else android.text.TextUtils.TruncateAt.END
         transcript.gravity = if (p > .22f) Gravity.BOTTOM else Gravity.CENTER_VERTICAL
-        transcript.textSize = 14f + 3f * p
-        transcript.setPadding(lerp(dp(13), dp(17), p), lerp(0, dp(12), p), lerp(dp(13), dp(17), p), lerp(0, dp(12), p))
+        transcript.textSize = 15f + p
+        transcript.setPadding(lerp(dp(12), dp(16), p), lerp(0, dp(10), p), lerp(dp(12), dp(16), p), lerp(0, dp(10), p))
     }
 
     private fun place(view: View, x: Int, y: Int, width: Int, height: Int) {
@@ -220,7 +234,7 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
             addUpdateListener {
                 val p = it.animatedValue as Float
                 val lp = surface.layoutParams
-                lp.height = lerp(dp(62), dp(218), p)
+                lp.height = lerp(dp(74), dp(188), p)
                 surface.layoutParams = lp
                 applyGeometry(p)
             }
@@ -272,7 +286,7 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         if (state == SpeechEngine.State.LISTENING && transcript.text.toString().startsWith("Starting")) {
             showTranscript("Listening · speak now", provisional = true)
         }
-        mic.text = if (state != SpeechEngine.State.IDLE) "■" else "≋"
+        mic.setImageResource(if (state != SpeechEngine.State.IDLE) R.drawable.ic_easyflow_stop else R.drawable.ic_easyflow_mic)
         mic.contentDescription = if (state != SpeechEngine.State.IDLE) "Stop voice input" else "Start voice input"
         if (state == SpeechEngine.State.LISTENING) startMicPulse() else stopMicPulse()
     }
