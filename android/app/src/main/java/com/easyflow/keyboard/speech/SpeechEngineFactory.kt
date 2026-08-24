@@ -9,9 +9,9 @@ class SpeechEngineFactory(private val context: Context) {
         // engine after setup; Android speech remains the instant, zero-setup fallback.
         val streaming = AndroidOnDeviceSpeechEngine(context)
         return when {
-            models.isInstalled -> RecoveringLocalSpeechEngine {
-                MoonshineSpeechEngine(context, models)
-            }
+            models.isInstalled -> RecoveringLocalSpeechEngine(
+                onTerminalFailure = models::markActiveUnhealthy,
+            ) { MoonshineSpeechEngine(context, models) }
             streaming.isGuaranteedOnDevice -> streaming
             else -> LocalModelRequiredSpeechEngine
         }
