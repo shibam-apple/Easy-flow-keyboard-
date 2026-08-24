@@ -30,6 +30,8 @@ jobs:
       - name: Add APK to web prototype
         run: cp android/app/build/outputs/apk/debug/app-debug.apk web/EasyFlow-v0.10.0-Liquid-Glass.apk
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with: { path: web }
       - name: Deploy to GitHub Pages
