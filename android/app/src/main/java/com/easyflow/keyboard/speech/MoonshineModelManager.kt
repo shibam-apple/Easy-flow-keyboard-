@@ -24,6 +24,10 @@ class MoonshineModelManager(context: Context) {
     val activeArch: Int get() = if (isMediumInstalled) MEDIUM_ARCH else SMALL_ARCH
     val activeName: String get() = if (isMediumInstalled) "Moonshine Medium" else "Moonshine Small"
 
+    fun markActiveUnhealthy() {
+        preferences.edit().putBoolean(if (isMediumInstalled) MEDIUM_READY else SMALL_READY, false).apply()
+    }
+
     suspend fun download(onProgress: (Int, String) -> Unit): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
@@ -41,6 +45,6 @@ class MoonshineModelManager(context: Context) {
                 } finally {
                     transcriber.close()
                 }
-            }
+            }.onFailure { markActiveUnhealthy() }
         }
 }
