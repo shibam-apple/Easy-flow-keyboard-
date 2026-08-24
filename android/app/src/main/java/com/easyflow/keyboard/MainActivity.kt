@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.text.SpannableString
@@ -14,14 +15,17 @@ import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.lifecycleScope
 import com.easyflow.keyboard.speech.MoonshineModelManager
+import com.easyflow.keyboard.text.GemmaModelManager
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -33,6 +37,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var modelDetail: TextView
     private lateinit var downloadButton: Button
     private lateinit var progress: ProgressBar
+    private lateinit var gemmaModels: GemmaModelManager
+    private lateinit var gemmaStatus: TextView
+    private lateinit var gemmaDetail: TextView
+    private lateinit var gemmaImport: Button
+    private lateinit var gemmaProgress: ProgressBar
+    private val gemmaPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { importGemma(it) }
+    }
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun panel(radius: Int = 24, fill: Int = 0xf7ffffff.toInt(), stroke: Int = hairline) =
@@ -62,6 +74,7 @@ class MainActivity : AppCompatActivity() {
                 View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         }
         val models = MoonshineModelManager(this)
+        gemmaModels = GemmaModelManager(this)
 
         val page = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -74,6 +87,13 @@ class MainActivity : AppCompatActivity() {
             addView(page, FrameLayout.LayoutParams(-1, -2))
         }
 
+        page.addView(ImageView(this).apply {
+            setImageResource(com.easyflow.keyboard.R.drawable.easy_flow_icon)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "Easy Flow"
+            elevation = dp(5).toFloat()
+        }, LinearLayout.LayoutParams(dp(82), dp(82)).apply { bottomMargin = dp(16) })
+
         val title = SpannableString("Easy Flow").apply {
             setSpan(ForegroundColorSpan(coral), 5, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
@@ -82,6 +102,11 @@ class MainActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             setPadding(0, dp(9), 0, dp(34))
         })
+
+        page.addView(text("LOCAL PIPELINE", 12f, secondary, Typeface.BOLD).apply {
+            letterSpacing = .12f
+            setPadding(dp(4), 0, 0, dp(12))
+        }, LinearLayout.LayoutParams(-1, -2))
 
         val modelCard = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -116,6 +141,54 @@ class MainActivity : AppCompatActivity() {
             visibility = View.GONE
         }
         page.addView(progress, LinearLayout.LayoutParams(-1, dp(3)).apply {
+            marginStart = dp(18); marginEnd = dp(18); topMargin = dp(8)
+        })
+
+        val gemmaCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(15), dp(12), dp(13))
+            background = panel(22)
+            elevation = dp(3).toFloat()
+        }
+        val gemmaHeader = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        gemmaHeader.addView(text("✦", 20f, 0xffff2e9c.toInt()).apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(dp(34), dp(42)))
+        val gemmaCopy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        gemmaStatus = text("", 16f, ink, Typeface.BOLD)
+        gemmaDetail = text("", 12f, secondary).apply { setPadding(0, dp(4), 0, 0) }
+        gemmaCopy.addView(gemmaStatus); gemmaCopy.addView(gemmaDetail)
+        gemmaHeader.addView(gemmaCopy, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(4) })
+        gemmaImport = Button(this).apply {
+            isAllCaps = false
+            textSize = 13f
+            setTextColor(coral)
+            minWidth = 0; minimumWidth = 0; minHeight = 0; minimumHeight = 0
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            background = panel(16, 0xfffff5f8.toInt(), 0x22ff4f67)
+            setOnClickListener { gemmaPicker.launch(arrayOf("application/octet-stream", "*/*")) }
+        }
+        gemmaHeader.addView(gemmaImport, LinearLayout.LayoutParams(-2, -2))
+        gemmaCard.addView(gemmaHeader, LinearLayout.LayoutParams(-1, -2))
+        val license = Button(this).apply {
+            text = "Accept Gemma license and download official model"
+            isAllCaps = false
+            textSize = 12f
+            setTextColor(secondary)
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            setPadding(dp(38), dp(7), dp(8), dp(7))
+            minHeight = 0; minimumHeight = 0
+            background = null
+            setOnClickListener { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GemmaModelManager.MODEL_PAGE))) }
+        }
+        gemmaCard.addView(license, LinearLayout.LayoutParams(-1, dp(36)))
+        page.addView(gemmaCard, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+
+        gemmaProgress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 100
+            progressTintList = android.content.res.ColorStateList.valueOf(0xffff2e9c.toInt())
+            progressBackgroundTintList = android.content.res.ColorStateList.valueOf(0xffffe2f2.toInt())
+            visibility = View.GONE
+        }
+        page.addView(gemmaProgress, LinearLayout.LayoutParams(-1, dp(3)).apply {
             marginStart = dp(18); marginEnd = dp(18); topMargin = dp(8)
         })
 
@@ -158,13 +231,14 @@ class MainActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             setPadding(0, dp(28), 0, dp(6))
         })
-        page.addView(text("Moonshine Medium streams entirely on your phone.\nNo recordings or transcripts are sent to a server.", 13f, secondary).apply {
+        page.addView(text("Moonshine transcribes and Gemma cleans the sentence entirely on your phone.\nNo recordings or transcripts are sent to a server.", 13f, secondary).apply {
             gravity = Gravity.CENTER
             setLineSpacing(0f, 1.18f)
         })
 
         setContentView(scroll)
         refreshModel(models)
+        refreshGemma()
     }
 
     private fun actionRow(symbol: String, title: String, detail: String, action: () -> Unit): View {
@@ -234,6 +308,43 @@ class MainActivity : AppCompatActivity() {
             modelDetail.text = "Medium Streaming · best local accuracy"
             downloadButton.text = "Install"
             downloadButton.isEnabled = true
+        }
+    }
+
+    private fun importGemma(uri: Uri) {
+        gemmaImport.isEnabled = false
+        gemmaProgress.visibility = View.VISIBLE
+        lifecycleScope.launch {
+            val result = gemmaModels.import(uri) { percent ->
+                runOnUiThread {
+                    gemmaProgress.progress = percent
+                    gemmaStatus.text = "Verifying Gemma… $percent%"
+                    gemmaDetail.text = "Copying and hashing locally"
+                }
+            }
+            result.onSuccess {
+                refreshGemma()
+                gemmaProgress.visibility = View.GONE
+            }.onFailure {
+                gemmaStatus.text = "Model import failed"
+                gemmaDetail.text = it.message ?: "Choose the official Gemma 3 1B .litertlm file"
+                gemmaImport.text = "Retry"
+                gemmaImport.isEnabled = true
+            }
+        }
+    }
+
+    private fun refreshGemma() {
+        if (gemmaModels.isInstalled) {
+            gemmaStatus.text = "Sentence cleanup ready"
+            gemmaDetail.text = "${GemmaModelManager.MODEL_NAME} · ${gemmaModels.installedSizeMb} MB · ${gemmaModels.fingerprint}"
+            gemmaImport.text = "Ready"
+            gemmaImport.isEnabled = false
+        } else {
+            gemmaStatus.text = "Install local sentence cleanup"
+            gemmaDetail.text = "Gemma 3 1B int4 · official LiteRT-LM model"
+            gemmaImport.text = "Import"
+            gemmaImport.isEnabled = true
         }
     }
 

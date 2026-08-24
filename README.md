@@ -1,8 +1,8 @@
 # Easy Flow
 
-Easy Flow is a local-first Android voice keyboard with a matching install-free web prototype. It has no QWERTY layout: speak naturally, review the cleaned sentence, then insert it into any app.
+Easy Flow is a local-first Android voice keyboard with a matching install-free web prototype. It has no QWERTY layout: tap once, speak naturally, and the cleaned sentence is inserted into any app.
 
-The Android app uses Moonshine v2 Medium Streaming for its highest-accuracy private, on-device transcription with live partial text. Existing Small installations remain a compact fallback; until either model is installed it uses Android speech recognition.
+The Android app uses Moonshine v2 Medium Streaming for private live transcription and Gemma 3 1B int4 through LiteRT-LM for local sentence cleanup. Existing Moonshine Small installations remain a compact ASR fallback; until either ASR model is installed it uses Android speech recognition.
 
 ## Try the web prototype
 
@@ -20,7 +20,7 @@ Chrome on Android supports live browser speech recognition. Other browsers autom
 4. Install `app-debug.apk` on the Android phone (allow installation from the browser/files app if Android asks).
 5. Open **Easy Flow**, tap **Enable Easy Flow**, enable it in Android's keyboard settings, then tap **Choose Easy Flow**.
 
-Open the app once after installation and select **Install AI**. The download is resumable and remains in the app's private storage.
+Open the app once after installation and install Moonshine. For the optional Gemma cleanup stage, accept the official Gemma license, download the Android LiteRT-LM model, then use **Import**. Both models remain in private app storage and their status is shown separately.
 
 ## Project structure
 
@@ -31,4 +31,4 @@ Open the app once after installation and select **Install AI**. The download is 
 
 ## Privacy
 
-The prototype stores no transcript history. Moonshine runs on the phone, drafts remain in memory, and final text is sent to the focused field only when **Insert** is pressed.
+The prototype stores no transcript history. Moonshine and Gemma run on the phone, drafts remain in memory, and only the safely finalized text is committed to the focused field.
