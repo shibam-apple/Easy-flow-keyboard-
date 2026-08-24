@@ -10,15 +10,16 @@ import android.graphics.PixelFormat
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.drawable.Drawable
+import android.os.Build
 import kotlin.math.max
 
 /**
- * A lightweight, pre-Android-12-safe approximation of adaptive Liquid Glass.
+ * Adaptive Liquid Glass for the IME surface.
  *
- * An IME cannot reliably sample the pixels of the app beneath it on every Android
- * version we support, so this drawable communicates the material through edge
- * lensing cues: directional side reflections, a concentrated lower caustic and
- * a small highlight that travels across the surface while the mic is active.
+ * Android does not expose another application's pixels to an IME window, so the
+ * material cannot refract the host app itself. On Android 13+ an AGSL runtime
+ * shader provides procedural lensing, dispersion and specular response. Older
+ * releases retain the same silhouette and optical cues through Canvas gradients.
  */
 class LiquidGlassDrawable(context: Context, private val radiusDp: Float = 28f) : Drawable() {
     private val density = context.resources.displayMetrics.density
@@ -30,8 +31,22 @@ class LiquidGlassDrawable(context: Context, private val radiusDp: Float = 28f) :
     }
     private val rect = RectF()
     private val streak = Path()
+    private val runtimeRenderer: RuntimeLiquidGlassRenderer? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            runCatching { RuntimeLiquidGlassRenderer() }.getOrNull()
+        } else {
+            null
+        }
+    private var drawableAlpha = 255
+    private var drawableColorFilter: ColorFilter? = null
 
     var highlightPhase: Float = .18f
+        set(value) {
+            field = value.coerceIn(0f, 1f)
+            invalidateSelf()
+        }
+
+    var expansion: Float = 0f
         set(value) {
             field = value.coerceIn(0f, 1f)
             invalidateSelf()
@@ -42,12 +57,26 @@ class LiquidGlassDrawable(context: Context, private val radiusDp: Float = 28f) :
         rect.set(bounds.left + inset, bounds.top + inset, bounds.right - inset, bounds.bottom - inset)
         val radius = radiusDp * density
 
-        fill.shader = LinearGradient(
-            rect.left, rect.top, rect.left, rect.bottom,
-            intArrayOf(0xe8ffffff.toInt(), 0xc9ffffff.toInt(), 0xddffffff.toInt()),
-            floatArrayOf(0f, .52f, 1f), Shader.TileMode.CLAMP,
-        )
-        canvas.drawRoundRect(rect, radius, radius, fill)
+        if (runtimeRenderer != null) {
+            runtimeRenderer.draw(
+                canvas = canvas,
+                bounds = rect,
+                radius = radius,
+                phase = highlightPhase,
+                expansion = expansion,
+                alpha = drawableAlpha,
+                colorFilter = drawableColorFilter,
+            )
+        } else {
+            // The fallback stays translucent like the reference instead of using
+            // the opaque white slab that made the previous version feel generic.
+            fill.shader = LinearGradient(
+                rect.left, rect.top, rect.left, rect.bottom,
+                intArrayOf(0x72ffffff, 0x3dffffff, 0x58ffffff),
+                floatArrayOf(0f, .52f, 1f), Shader.TileMode.CLAMP,
+            )
+            canvas.drawRoundRect(rect, radius, radius, fill)
+        }
 
         // The perimeter changes hue with its environment; it is intentionally not
         // a uniform outline. Coral is reflected on the left, cool sky on the right.
@@ -110,6 +139,7 @@ class LiquidGlassDrawable(context: Context, private val radiusDp: Float = 28f) :
     }
 
     override fun setAlpha(alpha: Int) {
+        drawableAlpha = alpha.coerceIn(0, 255)
         fill.alpha = alpha
         rim.alpha = alpha
         reflection.alpha = alpha
@@ -117,6 +147,7 @@ class LiquidGlassDrawable(context: Context, private val radiusDp: Float = 28f) :
     }
 
     override fun setColorFilter(colorFilter: ColorFilter?) {
+        drawableColorFilter = colorFilter
         fill.colorFilter = colorFilter
         rim.colorFilter = colorFilter
         reflection.colorFilter = colorFilter
