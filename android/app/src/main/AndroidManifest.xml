@@ -10,7 +10,7 @@
                 <action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <service android:name=".EasyFlowImeService" android:permission="android.permission.BIND_INPUT_METHOD" android:exported="true">
+        <service android:name=".EasyFlowImeService" android:permission="android.permission.BIND_INPUT_METHOD" android:exported="true" android:theme="@style/Theme.EasyFlow.Ime">
             <intent-filter><action android:name="android.view.InputMethod"/></intent-filter>
             <meta-data android:name="android.view.im" android:resource="@xml/method"/>
         </service>
