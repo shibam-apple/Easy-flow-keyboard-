@@ -63,7 +63,7 @@ internal class RuntimeLiquidGlassRenderer {
 
     private fun setUniform(name: String, vararg values: Float) {
         try {
-            shader.setFloatUniform(name, *values)
+            shader.setFloatUniform(name, values)
         } catch (error: Throwable) {
             Log.e(TAG, "Uniform '$name' failed with ${values.contentToString()}: ${error.message}", error)
             throw error
