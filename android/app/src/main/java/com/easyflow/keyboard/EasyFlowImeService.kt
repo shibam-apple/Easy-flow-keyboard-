@@ -8,14 +8,19 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.RippleDrawable
 import android.inputmethodservice.InputMethodService
+import android.os.Build
 import android.os.SystemClock
+import android.util.Log
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.View
+import android.view.WindowManager
 import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageButton
@@ -35,6 +40,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import java.util.function.Consumer
 
 class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     private val coral = 0xffff4f67.toInt()
@@ -54,6 +60,8 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     private lateinit var enter: ImageButton
     private lateinit var engine: SpeechEngine
     private lateinit var pipeline: TranscriptRefinementPipeline
+    private val glassSurfaces = mutableListOf<LiquidGlassDrawable>()
+    private var crossWindowBlurListener: Consumer<Boolean>? = null
 
     private val stabilizer = TranscriptStabilizer()
     private var writingContext = WritingContext()
@@ -63,7 +71,6 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     private var expanded = false
     private var geometryAnimator: ValueAnimator? = null
     private var micPulse: AnimatorSet? = null
-    private var glassAnimator: ValueAnimator? = null
     private var refinementJob: Job? = null
     private var refinementGeneration = 0
     private var lastVisualUpdate = 0L
@@ -76,7 +83,6 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         intArrayOf(fill, if (fill == coral) magenta else fill),
     ).apply {
         shape = GradientDrawable.OVAL
-        setStroke(dp(1), stroke)
     }
 
     private fun overlayRipple(): Drawable {
@@ -87,13 +93,10 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         return RippleDrawable(ColorStateList.valueOf(0x24ffffff), null, mask)
     }
 
-    private fun transcriptLensBackground(): Drawable = GradientDrawable(
-        GradientDrawable.Orientation.TOP_BOTTOM,
-        intArrayOf(0x33da6868, 0x33eedfdf),
-    ).apply {
+    private fun transcriptLensBackground(): Drawable = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
         cornerRadius = dp(21).toFloat()
-        setStroke(dp(1), 0x3dffffff)
+        setColor(0x14ffffff)
     }
 
     private fun control(icon: Int, description: String, click: () -> Unit) = ImageButton(this).apply {
@@ -123,10 +126,11 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
             setPadding(dp(7), dp(4), dp(7), dp(6))
             setBackgroundColor(Color.TRANSPARENT)
         }
-        glassMaterial = LiquidGlassDrawable(this, 37f)
+        glassMaterial = LiquidGlassDrawable(this, 37f).also { glassSurfaces += it }
         surface = FrameLayout(this).apply {
             background = glassMaterial
-            elevation = dp(10).toFloat()
+            elevation = 0f
+            clipToOutline = true
             clipChildren = false
             clipToPadding = false
         }
@@ -170,18 +174,61 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
             elevation = dp(5).toFloat()
         }
         backspace = control(R.drawable.ic_easyflow_backspace, "Backspace") { deleteOneCharacter() }.apply {
-            background = LiquidGlassDrawable(this@EasyFlowImeService, 22f)
+            background = LiquidGlassDrawable(this@EasyFlowImeService, 22f).also { glassSurfaces += it }
             alpha = 0f
         }
         enter = control(R.drawable.ic_easyflow_enter, "Enter") { pressEnter() }.apply {
-            background = LiquidGlassDrawable(this@EasyFlowImeService, 22f)
+            background = LiquidGlassDrawable(this@EasyFlowImeService, 22f).also { glassSurfaces += it }
         }
         surface.addView(mic); surface.addView(backspace); surface.addView(enter)
 
         surface.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyGeometry(expansion) }
-        surface.post { applyGeometry(0f) }
+        surface.post {
+            applyGeometry(0f)
+            configureRealBackdropBlur()
+        }
         scope.launch(Dispatchers.Default) { pipeline.prewarm() }
         return root
+    }
+
+    private fun configureRealBackdropBlur() {
+        glassSurfaces.forEach { it.attachHost(surface) }
+        val androidWindow = window?.window
+        androidWindow?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || androidWindow == null) {
+            Log.i(GLASS_TAG, "Cross-window blur unavailable: SDK=${Build.VERSION.SDK_INT} window=$androidWindow")
+            setBackdropActive(false)
+            return
+        }
+
+        val windowManager = getSystemService(WindowManager::class.java)
+        val capsuleBackground = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dp(37).toFloat()
+            setColor(0x08ffffff)
+        }
+        androidWindow.setBackgroundDrawable(
+            InsetDrawable(capsuleBackground, dp(7), dp(4), dp(7), dp(6)),
+        )
+        androidWindow.setBackgroundBlurRadius(dp(28))
+
+        val updateBlur = Consumer<Boolean> { enabled ->
+            Log.i(
+                GLASS_TAG,
+                "Cross-window compositor blur: enabled=$enabled SDK=${Build.VERSION.SDK_INT} " +
+                    "window=$androidWindow surface=$surface attached=${surface.isAttachedToWindow} " +
+                    "hardware=${surface.isHardwareAccelerated}",
+            )
+            setBackdropActive(enabled)
+        }
+        crossWindowBlurListener = updateBlur
+        windowManager.addCrossWindowBlurEnabledListener(mainExecutor, updateBlur)
+        updateBlur.accept(windowManager.isCrossWindowBlurEnabled)
+    }
+
+    private fun setBackdropActive(enabled: Boolean) {
+        glassSurfaces.forEach { it.backdropActive = enabled }
     }
 
     private fun applyGeometry(p: Float) {
@@ -342,21 +389,10 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
             it.duration = 720; it.repeatCount = ValueAnimator.INFINITE; it.repeatMode = ValueAnimator.REVERSE
         }
         micPulse = AnimatorSet().apply { playTogether(scaleX, scaleY); start() }
-        glassAnimator?.cancel()
-        glassAnimator = ValueAnimator.ofFloat(.12f, .88f).apply {
-            duration = 2100
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.REVERSE
-            interpolator = PathInterpolator(.32f, 0f, .2f, 1f)
-            addUpdateListener { glassMaterial.highlightPhase = it.animatedValue as Float }
-            start()
-        }
     }
 
     private fun stopMicPulse() {
         micPulse?.cancel(); micPulse = null
-        glassAnimator?.cancel(); glassAnimator = null
-        if (::glassMaterial.isInitialized) glassMaterial.highlightPhase = .18f
         if (::mic.isInitialized) mic.animate().scaleX(1f).scaleY(1f).setDuration(140).start()
     }
 
@@ -372,7 +408,17 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
 
     override fun onDestroy() {
         geometryAnimator?.cancel(); stopMicPulse(); refinementJob?.cancel(); scope.cancel()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            crossWindowBlurListener?.let {
+                getSystemService(WindowManager::class.java).removeCrossWindowBlurEnabledListener(it)
+            }
+        }
+        crossWindowBlurListener = null
         if (::engine.isInitialized) engine.cancel()
         super.onDestroy()
+    }
+
+    private companion object {
+        const val GLASS_TAG = "EasyFlowGlass"
     }
 }
