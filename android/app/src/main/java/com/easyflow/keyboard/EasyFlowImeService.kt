@@ -13,6 +13,7 @@ import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -115,9 +116,9 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
             isSmoothScrollingEnabled = true
             clipToPadding = false
             isVerticalFadingEdgeEnabled = true
-            fadingEdgeLength = dp(12)
+            setFadingEdgeLength(dp(12))
             overScrollMode = View.OVER_SCROLL_NEVER
-            addView(transcript, ScrollView.LayoutParams(-1, -2))
+            addView(transcript, FrameLayout.LayoutParams(-1, -2))
         }
         transcriptCard.addView(transcriptScroller, LinearLayout.LayoutParams(-1, dp(43)))
         root.addView(transcriptCard, LinearLayout.LayoutParams(-1, dp(70)))
