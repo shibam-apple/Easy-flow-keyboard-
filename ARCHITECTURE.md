@@ -11,6 +11,8 @@ Easy Flow is a local-first voice input method. The keyboard UI does not own tran
 5. **Confidence gate** — preserves numbers and flags risky edits for review instead of silently changing meaning.
 6. **Input method adapter** — commits the final string through `InputConnection`; undo deletes exactly the last inserted string.
 
+The keyboard renders partial hypotheses in an auto-following transcript viewport. It keeps the latest line visible with native smooth scrolling while preserving older text for manual review.
+
 ## Privacy boundary
 
 - Audio is captured only while the keyboard shows `Listening`.
@@ -36,4 +38,4 @@ Moonshine replaces the previous batch-style Whisper integration because it is de
 
 ## Next inference layer
 
-The correction interface is deliberately separate from ASR. A future small local language model can replace `FlowTextProcessor` for context-aware rewrites while the current deterministic layer remains the safety gate for numbers, URLs, names, and semantic changes.
+The correction interface is deliberately separate from ASR. The target two-model pipeline mirrors the useful part of OpenWhispr's design: Moonshine produces a faithful raw transcript, then a small local language model rewrites only that text with app and cursor context. `FlowTextProcessor` remains the final safety gate for numbers, URLs, names, and semantic changes. If the local language model fails or exceeds its latency budget, the raw transcript still completes normally.

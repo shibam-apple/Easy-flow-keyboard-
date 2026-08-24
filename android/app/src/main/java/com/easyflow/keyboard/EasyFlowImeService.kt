@@ -1,6 +1,9 @@
 package com.easyflow.keyboard
 
 import android.Manifest
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
@@ -11,6 +14,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import com.easyflow.keyboard.speech.SpeechEngine
 import com.easyflow.keyboard.speech.SpeechEngineFactory
@@ -26,6 +30,7 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     private val hairline = 0xffe3e3e8.toInt()
     private lateinit var status: TextView
     private lateinit var transcript: TextView
+    private lateinit var transcriptScroller: ScrollView
     private lateinit var detail: TextView
     private lateinit var mic: Button
     private lateinit var engine: SpeechEngine
@@ -35,6 +40,7 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     private var lastInserted = ""
     private var state = SpeechEngine.State.IDLE
     private var writingContext = WritingContext()
+    private var micPulse: AnimatorSet? = null
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun panel(radius: Int, fill: Int = 0xf7ffffff.toInt(), stroke: Int = hairline) =
@@ -82,7 +88,7 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         val transcriptCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(14), dp(7), dp(14), dp(7))
+            setPadding(dp(14), dp(6), dp(14), dp(6))
             background = panel(18, 0xfaffffff.toInt())
         }
         val meta = LinearLayout(this).apply {
@@ -97,14 +103,24 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
             gravity = Gravity.END or Gravity.CENTER_VERTICAL
         }
         meta.addView(detail, LinearLayout.LayoutParams(0, dp(16), 1.4f))
-        transcriptCard.addView(meta, LinearLayout.LayoutParams(-1, dp(16)))
+        transcriptCard.addView(meta, LinearLayout.LayoutParams(-1, dp(15)))
         transcript = label("Tap the microphone and speak.", 16f, ink, Typeface.BOLD).apply {
-            maxLines = 2
-            ellipsize = TextUtils.TruncateAt.START
-            gravity = Gravity.CENTER_VERTICAL
+            setLineSpacing(dp(2).toFloat(), 1f)
+            gravity = Gravity.BOTTOM
+            minHeight = dp(40)
         }
-        transcriptCard.addView(transcript, LinearLayout.LayoutParams(-1, dp(38)))
-        root.addView(transcriptCard, LinearLayout.LayoutParams(-1, dp(54)))
+        transcriptScroller = ScrollView(this).apply {
+            isFillViewport = true
+            isVerticalScrollBarEnabled = false
+            isSmoothScrollingEnabled = true
+            clipToPadding = false
+            isVerticalFadingEdgeEnabled = true
+            fadingEdgeLength = dp(12)
+            overScrollMode = View.OVER_SCROLL_NEVER
+            addView(transcript, ScrollView.LayoutParams(-1, -2))
+        }
+        transcriptCard.addView(transcriptScroller, LinearLayout.LayoutParams(-1, dp(43)))
+        root.addView(transcriptCard, LinearLayout.LayoutParams(-1, dp(70)))
 
         val controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -177,7 +193,7 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
 
     private fun clearDraft() {
         engine.cancel(); processed = null
-        transcript.text = "Tap the microphone and speak naturally."
+        showTranscript("Tap the microphone and speak naturally.", animate = false)
         detail.text = engine.id
         status.text = "Ready"
         state = SpeechEngine.State.IDLE
@@ -192,16 +208,17 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         }
         mic.text = if (state == SpeechEngine.State.LISTENING) "■" else "●"
         mic.contentDescription = if (state == SpeechEngine.State.LISTENING) "Stop voice input" else "Start voice input"
+        if (state == SpeechEngine.State.LISTENING) startMicPulse() else stopMicPulse()
     }
 
     override fun onPartial(text: String, stability: Float) = runOnMain {
-        transcript.text = stabilizer.update(text)
+        showTranscript(stabilizer.update(text))
         detail.text = "${engine.id} · live"
     }
 
     override fun onFinal(text: String, confidence: Float) = runOnMain {
         processed = processor.process(text, confidence, writingContext)
-        transcript.text = processed!!.text
+        showTranscript(processed!!.text)
         detail.text = when {
             processed!!.requiresReview -> "Review suggested · ${processed!!.changes.joinToString()}"
             processed!!.changes.isNotEmpty() -> processed!!.changes.joinToString(" · ")
@@ -215,7 +232,44 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         if (!recoverable) detail.text = "Open Easy Flow settings"
     }
 
+    private fun showTranscript(value: String, animate: Boolean = true) {
+        if (transcript.text.toString() == value) return
+        transcript.text = value
+        transcriptScroller.post {
+            val target = (transcript.height - transcriptScroller.height + dp(3)).coerceAtLeast(0)
+            if (animate) transcriptScroller.smoothScrollTo(0, target)
+            else transcriptScroller.scrollTo(0, target)
+        }
+    }
+
+    private fun startMicPulse() {
+        if (micPulse?.isRunning == true) return
+        val scaleX = ObjectAnimator.ofFloat(mic, View.SCALE_X, 1f, 1.055f)
+        val scaleY = ObjectAnimator.ofFloat(mic, View.SCALE_Y, 1f, 1.055f)
+        listOf(scaleX, scaleY).forEach {
+            it.duration = 720
+            it.repeatCount = ValueAnimator.INFINITE
+            it.repeatMode = ValueAnimator.REVERSE
+        }
+        micPulse = AnimatorSet().apply {
+            playTogether(scaleX, scaleY)
+            start()
+        }
+    }
+
+    private fun stopMicPulse() {
+        micPulse?.cancel()
+        micPulse = null
+        if (::mic.isInitialized) {
+            mic.animate().scaleX(1f).scaleY(1f).setDuration(140).start()
+        }
+    }
+
     private fun runOnMain(action: () -> Unit) { status.post { action() } }
     override fun onFinishInput() { engine.cancel(); super.onFinishInput() }
-    override fun onDestroy() { if (::engine.isInitialized) engine.cancel(); super.onDestroy() }
+    override fun onDestroy() {
+        stopMicPulse()
+        if (::engine.isInitialized) engine.cancel()
+        super.onDestroy()
+    }
 }
