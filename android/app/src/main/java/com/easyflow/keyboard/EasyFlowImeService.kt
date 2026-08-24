@@ -266,7 +266,7 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     }
 
     private fun toggleListening() {
-        if (speechState == SpeechEngine.State.LISTENING) { engine.stop(); return }
+        if (speechState != SpeechEngine.State.IDLE) { engine.stop(); return }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             status.text = "Allow microphone in Easy Flow"
             setExpanded(true)
@@ -278,6 +278,7 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         writingContext = WritingContext(beforeCursor, currentInputEditorInfo?.packageName.orEmpty())
         engine.setContext("App: ${writingContext.appPackage}\nText before cursor: $beforeCursor")
         stabilizer.reset(); processed = null
+        showTranscript("Starting local transcription…", provisional = true)
         engine.start(this)
     }
 
@@ -298,8 +299,11 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
             SpeechEngine.State.LISTENING -> "Listening"
             SpeechEngine.State.PROCESSING -> "Finishing…"
         }
-        mic.text = if (state == SpeechEngine.State.LISTENING) "■" else "≋"
-        mic.contentDescription = if (state == SpeechEngine.State.LISTENING) "Stop voice input" else "Start voice input"
+        if (state == SpeechEngine.State.LISTENING && transcript.text.toString().startsWith("Starting")) {
+            showTranscript("Listening · speak now", provisional = true)
+        }
+        mic.text = if (state != SpeechEngine.State.IDLE) "■" else "≋"
+        mic.contentDescription = if (state != SpeechEngine.State.IDLE) "Stop voice input" else "Start voice input"
         if (state == SpeechEngine.State.LISTENING) startMicPulse() else stopMicPulse()
     }
 
@@ -326,7 +330,8 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
 
     override fun onError(message: String, recoverable: Boolean) = runOnMain {
         status.text = message
-        setExpanded(true)
+        showTranscript(message, provisional = true)
+        if (!recoverable) setExpanded(true)
         surface.performHapticFeedback(HapticFeedbackConstants.REJECT)
     }
 
