@@ -74,6 +74,8 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     private var refinementJob: Job? = null
     private var refinementGeneration = 0
     private var lastVisualUpdate = 0L
+    private var lastPartial = ""
+    private var insertedText = ""
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun lerp(a: Int, b: Int, p: Float) = (a + (b - a) * p).toInt()
@@ -177,7 +179,7 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
             background = LiquidGlassDrawable(this@EasyFlowImeService, 22f).also { glassSurfaces += it }
             alpha = 0f
         }
-        enter = control(R.drawable.ic_easyflow_enter, "Enter") { pressEnter() }.apply {
+        enter = control(R.drawable.ic_easyflow_enter, "Enter") { performPrimaryAction() }.apply {
             background = LiquidGlassDrawable(this@EasyFlowImeService, 22f).also { glassSurfaces += it }
         }
         surface.addView(mic); surface.addView(backspace); surface.addView(enter)
@@ -309,7 +311,8 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         val beforeCursor = currentInputConnection?.getTextBeforeCursor(600, 0)?.toString().orEmpty()
         writingContext = WritingContext(beforeCursor, currentInputEditorInfo?.packageName.orEmpty())
         engine.setContext("App: ${writingContext.appPackage}\nText before cursor: $beforeCursor")
-        stabilizer.reset(); processed = null
+        stabilizer.reset(); processed = null; lastPartial = ""; insertedText = ""
+        updatePrimaryAction()
         showTranscript("Starting local transcription…", provisional = true)
         engine.start(this)
     }
@@ -318,10 +321,39 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         currentInputConnection?.deleteSurroundingText(1, 0)
     }
 
-    private fun pressEnter() {
+    private fun performPrimaryAction() {
         val connection = currentInputConnection ?: return
+        processed?.text?.takeIf { it.isNotBlank() }?.let { value ->
+            connection.commitText(value, 1)
+            insertedText = value
+            processed = null
+            status.text = "Inserted · tap arrow to undo"
+            transcript.setTextColor(ink)
+            updatePrimaryAction()
+            surface.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+            return
+        }
+        if (insertedText.isNotBlank()) {
+            connection.deleteSurroundingText(insertedText.length, 0)
+            showTranscript(insertedText, provisional = false)
+            processed = ProcessedText(insertedText, insertedText, 1f, emptyList(), false)
+            insertedText = ""
+            status.text = "Undone · edit or insert again"
+            updatePrimaryAction()
+            return
+        }
         connection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
         connection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+    }
+
+    private fun updatePrimaryAction() {
+        if (!::enter.isInitialized) return
+        enter.contentDescription = when {
+            processed?.text?.isNotBlank() == true -> "Insert transcript"
+            insertedText.isNotBlank() -> "Undo inserted transcript"
+            else -> "Enter"
+        }
+        enter.alpha = if (processed != null || insertedText.isNotBlank()) 1f else .82f
     }
 
     override fun onState(state: SpeechEngine.State) = runOnMain {
@@ -340,7 +372,8 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
     }
 
     override fun onPartial(text: String, stability: Float) = runOnMain {
-        showTranscript(stabilizer.update(text), provisional = stability < .88f)
+        lastPartial = stabilizer.update(text)
+        showTranscript(lastPartial, provisional = stability < .88f)
         status.text = "Listening"
     }
 
@@ -354,15 +387,23 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
             if (token != refinementGeneration) return@launch
             processed = result
             showTranscript(result.text, provisional = false)
-            currentInputConnection?.commitText(result.text, 1)
-            status.text = if (result.changes.contains("Gemma local cleanup")) "Polished and inserted" else "Inserted"
+            status.text = if (result.changes.contains("Gemma local cleanup")) "Polished · tap arrow to insert" else "Ready · tap arrow to insert"
+            updatePrimaryAction()
+            setExpanded(result.requiresReview || result.text.length > 46)
             surface.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
         }
     }
 
     override fun onError(message: String, recoverable: Boolean) = runOnMain {
         status.text = message
-        showTranscript(message, provisional = true)
+        if (lastPartial.isNotBlank()) {
+            processed = ProcessedText(lastPartial, lastPartial, .55f, emptyList(), true)
+            showTranscript(lastPartial, provisional = false)
+            status.text = "Partial transcript saved · review and insert"
+            updatePrimaryAction()
+        } else {
+            showTranscript(message, provisional = true)
+        }
         if (!recoverable) setExpanded(true)
         surface.performHapticFeedback(HapticFeedbackConstants.REJECT)
     }
