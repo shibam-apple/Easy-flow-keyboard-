@@ -39,6 +39,7 @@ internal class RuntimeLiquidGlassRenderer {
         bounds: RectF,
         radius: Float,
         expansion: Float,
+        listening: Boolean,
         backdropActive: Boolean,
         alpha: Int,
         colorFilter: ColorFilter?,
@@ -47,6 +48,7 @@ internal class RuntimeLiquidGlassRenderer {
         setUniform("resolution", bounds.width(), bounds.height())
         setUniform("cornerRadius", radius)
         setUniform("expansion", expansion)
+        setUniform("listening", if (listening) 1f else 0f)
         setUniform("backdropActive", if (backdropActive) 1f else 0f)
         if (!uniformSetLogged) {
             Log.i(
@@ -77,6 +79,7 @@ internal class RuntimeLiquidGlassRenderer {
             "resolution",
             "cornerRadius",
             "expansion",
+            "listening",
             "backdropActive",
         )
         val SET_UNIFORMS = listOf(
@@ -84,6 +87,7 @@ internal class RuntimeLiquidGlassRenderer {
             "resolution",
             "cornerRadius",
             "expansion",
+            "listening",
             "backdropActive",
         )
 
@@ -92,6 +96,7 @@ internal class RuntimeLiquidGlassRenderer {
             uniform float2 resolution;
             uniform float cornerRadius;
             uniform float expansion;
+            uniform float listening;
             uniform float backdropActive;
 
             float sdRoundBox(float2 p, float2 b, float r) {
@@ -105,13 +110,26 @@ internal class RuntimeLiquidGlassRenderer {
                 float d = sdRoundBox(centered, resolution * 0.5 - 1.0, cornerRadius);
                 float coverage = 1.0 - smoothstep(-0.65, 0.85, d);
 
-                // Real glass is mostly transmission. A restrained, symmetric
-                // Fresnel response gives the capsule optical thickness without
-                // painting directional highlights or a fictional environment.
-                float edge = 1.0 - smoothstep(0.0, 4.0, -d);
-                float centerAlpha = mix(0.20, 0.045, backdropActive);
-                float fresnelAlpha = mix(0.030, 0.055, backdropActive);
-                float alpha = (centerAlpha + fresnelAlpha * edge) * coverage;
+                // Per-pixel lens normal derived from the capsule SDF. Android's compositor
+                // supplies the real blurred backdrop; this shader only supplies optical
+                // thickness, Fresnel response and edge compression over those real pixels.
+                float e = 1.25;
+                float dx = sdRoundBox(centered + float2(e, 0.0), resolution * 0.5 - 1.0, cornerRadius)
+                         - sdRoundBox(centered - float2(e, 0.0), resolution * 0.5 - 1.0, cornerRadius);
+                float dy = sdRoundBox(centered + float2(0.0, e), resolution * 0.5 - 1.0, cornerRadius)
+                         - sdRoundBox(centered - float2(0.0, e), resolution * 0.5 - 1.0, cornerRadius);
+                float2 normal = normalize(float2(dx, dy) + float2(0.0001));
+                float rim = 1.0 - smoothstep(0.0, mix(5.5, 7.5, expansion), -d);
+                float innerRim = smoothstep(1.5, 5.5, -d) * (1.0 - smoothstep(5.5, 9.5, -d));
+                float fresnel = pow(1.0 - abs(normal.y) * 0.34, 3.0) * rim;
+                float keyLight = max(0.0, dot(normal, normalize(float2(-0.42, -0.91)))) * rim;
+                float refractionCompression = rim * (0.018 + 0.012 * abs(normal.x));
+
+                float centerAlpha = mix(0.205, 0.040, backdropActive);
+                float opticalAlpha = 0.030 * fresnel + 0.052 * keyLight + 0.020 * innerRim;
+                opticalAlpha += refractionCompression * mix(0.75, 1.0, backdropActive);
+                opticalAlpha += listening * 0.012 * innerRim;
+                float alpha = (centerAlpha + opticalAlpha) * coverage;
                 alpha *= 1.0 - 0.05 * expansion;
 
                 return half4(half3(1.0) * half(alpha), half(alpha));

@@ -3,6 +3,7 @@ package com.easyflow.keyboard.speech
 interface SpeechEngine {
     val id: String
     val isReady: Boolean
+    fun warmUp() = Unit
     fun setContext(hint: String) = Unit
     fun start(listener: Listener)
     fun stop()

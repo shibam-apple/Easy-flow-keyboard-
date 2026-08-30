@@ -59,6 +59,12 @@ class LiquidGlassDrawable(context: Context, private val radiusDp: Float = 28f) :
             invalidateSelf()
         }
 
+    var listening: Boolean = false
+        set(value) {
+            field = value
+            invalidateSelf()
+        }
+
     // Retained for binary/source compatibility; the redesigned material has no
     // travelling fake highlight.
     var highlightPhase: Float = 0f
@@ -99,6 +105,7 @@ class LiquidGlassDrawable(context: Context, private val radiusDp: Float = 28f) :
                     bounds = rect,
                     radius = radius,
                     expansion = expansion,
+                    listening = listening,
                     backdropActive = backdropActive,
                     alpha = drawableAlpha,
                     colorFilter = drawableColorFilter,

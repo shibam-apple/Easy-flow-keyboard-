@@ -119,6 +119,7 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
 
     override fun onCreateInputView(): View {
         engine = SpeechEngineFactory(this).create()
+        engine.warmUp()
         pipeline = TranscriptRefinementPipeline(this)
 
         val root = LinearLayout(this).apply {
@@ -197,6 +198,13 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         glassSurfaces.forEach { it.attachHost(surface) }
         val androidWindow = window?.window
         androidWindow?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            crossWindowBlurListener?.let {
+                getSystemService(WindowManager::class.java).removeCrossWindowBlurEnabledListener(it)
+            }
+            crossWindowBlurListener = null
+        }
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || androidWindow == null) {
             Log.i(GLASS_TAG, "Cross-window blur unavailable: SDK=${Build.VERSION.SDK_INT} window=$androidWindow")
@@ -369,6 +377,7 @@ class EasyFlowImeService : InputMethodService(), SpeechEngine.Listener {
         mic.setImageResource(if (state != SpeechEngine.State.IDLE) R.drawable.ic_easyflow_stop else R.drawable.ic_easyflow_mic)
         mic.contentDescription = if (state != SpeechEngine.State.IDLE) "Stop voice input" else "Start voice input"
         if (state == SpeechEngine.State.LISTENING) startMicPulse() else stopMicPulse()
+        glassMaterial.listening = state == SpeechEngine.State.LISTENING
     }
 
     override fun onPartial(text: String, stability: Float) = runOnMain {

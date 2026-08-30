@@ -25,6 +25,26 @@ class MoonshineSpeechEngine(
     private var stopping = false
     private var finalized = false
     private var contextHint = ""
+    @Volatile private var warmed = false
+
+    override fun warmUp() {
+        if (!isReady || warmed) return
+        warmed = true
+        worker.execute {
+            val warming = MicTranscriber(appContext)
+                .language("en")
+                .modelArch(models.activeArch)
+            try {
+                // This primes native libraries, model metadata and the OS file cache before the
+                // user taps the mic. The live session still owns its recorder and callbacks.
+                warming.load()
+            } catch (_: RuntimeException) {
+                warmed = false
+            } finally {
+                warming.close()
+            }
+        }
+    }
 
     override fun setContext(hint: String) {
         contextHint = hint.takeLast(600)

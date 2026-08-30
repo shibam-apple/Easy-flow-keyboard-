@@ -9,8 +9,8 @@ android {
         applicationId = "com.easyflow.keyboard"
         minSdk = 26
         targetSdk = 35
-        versionCode = 14
-        versionName = "0.12.0"
+        versionCode = 15
+        versionName = "0.13.0"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     compileOptions {

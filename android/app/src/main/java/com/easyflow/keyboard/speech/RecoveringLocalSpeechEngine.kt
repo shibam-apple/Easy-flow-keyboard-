@@ -19,6 +19,8 @@ class RecoveringLocalSpeechEngine(
     override val id: String get() = "${active.id} · local recovery"
     override val isReady: Boolean get() = active.isReady
 
+    override fun warmUp() = active.warmUp()
+
     override fun setContext(hint: String) {
         contextHint = hint
         active.setContext(hint)
@@ -61,7 +63,6 @@ class RecoveringLocalSpeechEngine(
                 if (!current()) return
                 if (recoverable && attempt == 0) retry(token)
                 else {
-                    onTerminalFailure()
                     client?.onError(message, recoverable)
                 }
             }
@@ -72,11 +73,10 @@ class RecoveringLocalSpeechEngine(
             if (attempt == 0) retry(token)
             else {
                 active.cancel()
-                onTerminalFailure()
-                client?.onError("Local model is not responding · repair Moonshine in Easy Flow", false)
+                client?.onError("Local model is still starting · tap once more", true)
                 client?.onState(SpeechEngine.State.IDLE)
             }
-        }, 10_000)
+        }, 18_000)
     }
 
     private fun retry(token: Int) {
